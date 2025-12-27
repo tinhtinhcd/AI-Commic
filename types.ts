@@ -23,11 +23,14 @@ export interface ComicPanel {
   id: string;
   description: string;
   dialogue: string;
+  caption?: string; // New: Narrator text
   charactersInvolved: string[];
   imageUrl?: string;
   videoUrl?: string;
-  audioUrl?: string;
+  audioUrl?: string; // Dialogue audio
+  captionAudioUrl?: string; // New: Narrator audio
   isGenerating?: boolean;
+  shouldAnimate?: boolean; // New: User choice for video
 }
 
 export interface Character {
@@ -35,7 +38,7 @@ export interface Character {
   name: string;
   description: string;
   imageUrl?: string;
-  voice?: string; // New: Assigned voice actor name
+  voice?: string; 
   isGenerating?: boolean;
 }
 

@@ -138,7 +138,7 @@ export const censorContent = async (content: string, type: 'SCRIPT' | 'IMAGE'): 
 
 export const generateScript = async (theme: string, style: string): Promise<{ title: string; panels: ComicPanel[] }> => {
   const ai = getAI();
-  // UPGRADE: Added Dramatic Structure instruction
+  // UPGRADE: Added Dramatic Structure instruction and CAPTION field
   const prompt = `
     Create a comic book script based on: "${theme}". Style: "${style}". 
     Structure the story with 4-6 panels following this arc:
@@ -148,7 +148,11 @@ export const generateScript = async (theme: string, style: string): Promise<{ ti
     4. Climax / Twist
     5. Resolution (or Cliffhanger)
 
-    Output JSON with description, dialogue, characters. Also suggest a title.
+    Output JSON. 
+    'description': Visual instructions for the artist.
+    'dialogue': Spoken text by characters (or empty).
+    'caption': Narrator text/box text (or empty).
+    'charactersInvolved': List of names.
   `;
   const schema: Schema = {
     type: Type.OBJECT,
@@ -161,9 +165,10 @@ export const generateScript = async (theme: string, style: string): Promise<{ ti
           properties: {
             description: { type: Type.STRING },
             dialogue: { type: Type.STRING },
+            caption: { type: Type.STRING },
             charactersInvolved: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: ["description", "dialogue", "charactersInvolved"]
+          required: ["description", "charactersInvolved"]
         }
       }
     },
@@ -177,7 +182,7 @@ export const generateScript = async (theme: string, style: string): Promise<{ ti
   });
 
   const data = JSON.parse(response.text!);
-  const panelsWithIds = data.panels.map((p: any) => ({ ...p, id: crypto.randomUUID() }));
+  const panelsWithIds = data.panels.map((p: any) => ({ ...p, id: crypto.randomUUID(), shouldAnimate: true })); // Default to animate
   return { title: data.title, panels: panelsWithIds };
 };
 
@@ -197,21 +202,43 @@ export const generateCharacterDesign = async (characterName: string, projectThem
 
 export const generatePanelImage = async (panel: ComicPanel, style: string, characters: Character[]): Promise<string> => {
   const ai = getAI();
-  // UPGRADE: Improved context injection for consistency
-  const charCtx = characters
+  
+  // UPGRADE: MULTIMODAL INPUT (Reference Images)
+  const parts: any[] = [];
+  
+  // 1. Add Text Prompt
+  const charDescriptions = characters
     .filter(c => panel.charactersInvolved.some(name => c.name.toLowerCase().includes(name.toLowerCase())))
     .map(c => `${c.name} (Appearance: ${c.description})`)
     .join(". ");
-    
-  const prompt = `Comic panel. Style: ${style}. 
-  Scene Description: ${panel.description}. 
-  Characters in scene: ${charCtx}. 
-  Action/Context from dialogue: "${panel.dialogue}".
-  Ensure high quality and consistent artistic style.`;
+
+  const prompt = `
+    Comic panel art. Style: ${style}.
+    Scene: ${panel.description}.
+    Characters: ${charDescriptions}.
+    Action: "${panel.dialogue || panel.caption || ''}".
+    Maintain consistent character appearance based on provided reference images.
+  `;
+  
+  parts.push({ text: prompt });
+
+  // 2. Add Reference Images
+  // Only add images for characters actually in this panel to avoid confusion
+  characters.forEach(char => {
+      if (panel.charactersInvolved.some(name => char.name.toLowerCase().includes(name.toLowerCase())) && char.imageUrl) {
+          const base64 = char.imageUrl.split(',')[1];
+          parts.push({
+              inlineData: {
+                  mimeType: 'image/png',
+                  data: base64
+              }
+          });
+      }
+  });
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-image",
-    contents: prompt,
+    contents: { parts },
     config: { imageConfig: { aspectRatio: "4:3" } }
   });
   return `data:image/png;base64,${response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data}`;
@@ -231,7 +258,7 @@ export const translateScript = async (currentScript: {title: string, panels: Com
     const ai = getAI();
     const prompt = `
         Translate the following comic script to ${targetLanguage}.
-        Keep the IDs identical. Only translate the 'dialogue', 'description' and 'title'.
+        Keep the IDs identical. Only translate 'dialogue', 'description', 'caption' and 'title'.
         
         Input JSON:
         ${JSON.stringify(currentScript)}
@@ -249,9 +276,10 @@ export const translateScript = async (currentScript: {title: string, panels: Com
                 id: { type: Type.STRING },
                 description: { type: Type.STRING },
                 dialogue: { type: Type.STRING },
+                caption: { type: Type.STRING },
                 charactersInvolved: { type: Type.ARRAY, items: { type: Type.STRING } }
               },
-              required: ["id", "description", "dialogue", "charactersInvolved"]
+              required: ["id", "description", "charactersInvolved"]
             }
           }
         },
@@ -268,9 +296,8 @@ export const translateScript = async (currentScript: {title: string, panels: Com
     return data;
 };
 
-export const generateVoiceover = async (text: string, voiceName: string = 'Puck'): Promise<string> => {
+export const generateVoiceover = async (text: string, voiceName: string): Promise<string> => {
     const ai = getAI();
-    // UPGRADE: Accepts voiceName parameter
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text }] }],
