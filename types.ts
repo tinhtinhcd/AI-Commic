@@ -44,6 +44,9 @@ export interface Character {
   // NEW: Consistency features
   isLocked?: boolean; // If true, this design is the Source of Truth
   role?: 'MAIN' | 'SUPPORTING';
+  // NEW: Manual Upload & Style Check
+  consistencyStatus?: 'PENDING' | 'PASS' | 'FAIL';
+  consistencyReport?: string;
 }
 
 export enum WorkflowStage {

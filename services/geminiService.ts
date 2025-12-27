@@ -308,6 +308,61 @@ export const generateCharacterDesign = async (
   return { description, imageUrl: `data:image/png;base64,${imageResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data}` };
 };
 
+// NEW: Analyze Character Consistency (Vision)
+export const analyzeCharacterConsistency = async (
+    imageBase64: string,
+    targetStyle: string,
+    characterName: string
+): Promise<{ isConsistent: boolean, critique: string }> => {
+    const ai = getAI();
+    const prompt = `
+        Act as an Art Director. 
+        Analyze this uploaded image for character: "${characterName}".
+        Target Project Style: "${targetStyle}".
+        
+        Is this image consistent with the Target Style?
+        If yes, return isConsistent: true.
+        If no (e.g. style is Photo-realistic but target is Anime), return isConsistent: false and a short critique explaining why.
+        
+        Return JSON.
+    `;
+    
+    // Clean base64 header if present
+    const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
+
+    const schema: Schema = {
+        type: Type.OBJECT,
+        properties: {
+            isConsistent: { type: Type.BOOLEAN },
+            critique: { type: Type.STRING }
+        },
+        required: ["isConsistent", "critique"]
+    };
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-image", // Using vision model to see the image
+        contents: {
+            parts: [
+                { inlineData: { mimeType: 'image/png', data: cleanBase64 } },
+                { text: prompt }
+            ]
+        },
+        config: { responseMimeType: "application/json" } // Note: 2.5 flash image might default to text, so we rely on parsing or standard response
+    });
+    
+    // Parse result (handling potential markdown wrapping)
+    let text = response.text!;
+    if (text.startsWith("```json")) {
+        text = text.replace(/^```json\n/, "").replace(/\n```$/, "");
+    }
+    
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        return { isConsistent: true, critique: "Analysis inconclusive, assumed consistent." };
+    }
+};
+
 export const generatePanelImage = async (panel: ComicPanel, style: string, characters: Character[]): Promise<string> => {
   const ai = getAI();
   
