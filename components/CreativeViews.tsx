@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { AgentRole, ComicProject, Character, ResearchData, CharacterVariant, AgentTask, ComicPanel } from '../types';
 import { AGENTS } from '../constants';
-import { MessageCircle, Loader2, Send, FileText, TrendingUp, Upload, Download, BookOpen, Sparkles, Lightbulb, Users, Feather, CheckCircle, RefreshCw, Lock, Unlock, ScanFace, Globe, Palette, Layers, ListTodo, Plus, Check, Trash2, Bot, Play, Film, AlertTriangle } from 'lucide-react';
+import { MessageCircle, Loader2, Send, FileText, TrendingUp, Upload, Download, BookOpen, Sparkles, Lightbulb, Users, Feather, CheckCircle, RefreshCw, Lock, Unlock, ScanFace, Globe, Palette, Layers, ListTodo, Plus, Check, Trash2, Bot, Play, Film, AlertTriangle, Search } from 'lucide-react';
 
 const safeRender = (value: any): React.ReactNode => {
     if (typeof value === 'string' || typeof value === 'number') return value;
@@ -176,6 +176,7 @@ export const WriterView: React.FC<{
     handleImportScript: (e: React.ChangeEvent<HTMLInputElement>) => void;
     handleExportScript: () => void;
     handleApproveResearchAndScript: () => void;
+    handleForceExtractCast: () => void; // NEW PROP
     updateProject: (updates: Partial<ComicProject>) => void;
     loading: boolean;
     t: (k: string) => string;
@@ -183,7 +184,7 @@ export const WriterView: React.FC<{
     writerLogsEndRef: React.RefObject<HTMLDivElement>;
     role: AgentRole;
     isLongFormat: boolean;
-}> = ({ project, handleImportScript, handleExportScript, handleApproveResearchAndScript, updateProject, loading, t, scriptStep, writerLogsEndRef, role, isLongFormat }) => {
+}> = ({ project, handleImportScript, handleExportScript, handleApproveResearchAndScript, handleForceExtractCast, updateProject, loading, t, scriptStep, writerLogsEndRef, role, isLongFormat }) => {
     const panels = project.panels || [];
     const characters = project.characters || [];
 
@@ -270,7 +271,18 @@ export const WriterView: React.FC<{
                       </div>
 
                       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
-                           <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2"><Users className="w-4 h-4 text-purple-500"/> Cast</h4>
+                           <div className="flex justify-between items-center mb-3">
+                               <h4 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2"><Users className="w-4 h-4 text-purple-500"/> Cast</h4>
+                               <button 
+                                   onClick={handleForceExtractCast}
+                                   disabled={loading}
+                                   className="text-[10px] bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-1 rounded-lg border border-purple-100 dark:border-purple-800 font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors flex items-center gap-1"
+                                   title="Re-scan script for characters"
+                               >
+                                   {loading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Search className="w-3 h-3"/>}
+                                   Scan Script
+                               </button>
+                           </div>
                            <div className="space-y-2">
                                {characters.map(char => (
                                    <div key={char.id} className="flex items-center gap-2 text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded-lg">

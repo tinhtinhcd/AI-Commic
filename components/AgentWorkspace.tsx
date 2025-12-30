@@ -544,6 +544,67 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
       }
   };
 
+  // --- NEW: FORCE EXTRACT CAST HANDLER ---
+  const handleForceExtractCast = async () => {
+      setLoading(true);
+      try {
+          // Priority: Panels (if written) -> Original Script
+          let textToAnalyze = project.panels.map(p => `${p.charactersInvolved.join(', ')} ${p.description} ${p.dialogue}`).join("\n");
+          if (textToAnalyze.length < 50) {
+              textToAnalyze = project.originalScript || "";
+          }
+
+          if (textToAnalyze.length < 50) {
+               alert("Chưa có nội dung kịch bản để phân tích. (Script is empty)");
+               setLoading(false);
+               return;
+          }
+
+          addLog(AgentRole.SCRIPTWRITER, "Scanning script for characters...", 'info');
+          
+          // Re-use existing service
+          // Fallback concept if missing
+          const concept = project.storyConcept || { 
+             premise: "Comic Story", 
+             similarStories: [], 
+             uniqueTwist: "", 
+             genreTrends: "" 
+          };
+
+          const newChars = await GeminiService.generateComplexCharacters(
+              concept,
+              project.masterLanguage,
+              project.seriesBible?.worldSetting || "Standard",
+              project.modelTier || 'STANDARD',
+              textToAnalyze
+          );
+
+          // Merge Logic: Keep existing images if name matches
+          const mergedChars = [...project.characters];
+          let added = 0;
+          
+          newChars.forEach(nc => {
+              const existingIndex = mergedChars.findIndex(c => c.name.toLowerCase().trim() === nc.name.toLowerCase().trim());
+              if (existingIndex === -1) {
+                  mergedChars.push({
+                      ...nc,
+                      id: crypto.randomUUID(),
+                      voice: AVAILABLE_VOICES[Math.floor(Math.random() * AVAILABLE_VOICES.length)]
+                  });
+                  added++;
+              }
+          });
+
+          updateProject({ characters: mergedChars });
+          addLog(AgentRole.SCRIPTWRITER, `Found ${added} new characters. Total: ${mergedChars.length}`, 'success');
+
+      } catch (e: any) {
+          addLog(AgentRole.SCRIPTWRITER, "Extraction Error: " + e.message, 'error');
+      } finally {
+          setLoading(false);
+      }
+  };
+
   const handleGenerateFinalScript = async () => {
       setScriptStep('WRITING'); 
       const targetChapter = project.currentChapter || 1; 
@@ -1062,7 +1123,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   const progressBar = renderProgressBar();
 
   if (role === AgentRole.MARKET_RESEARCHER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><ResearchView project={project} handleResearchChatSend={handleResearchChatSend} researchChatInput={researchChatInput} setResearchChatInput={setResearchChatInput} handleFinalizeStrategyFromChat={handleFinalizeStrategyFromChat} handleUpdateMarketAnalysis={handleUpdateMarketAnalysis} updateProject={updateProject} loading={loading} t={t} chatEndRef={chatEndRef} role={role}/></AgentViewWrapper>;
-  if (role === AgentRole.SCRIPTWRITER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><WriterView project={project} handleImportScript={handleImportScript} handleExportScript={handleExportScript} handleApproveResearchAndScript={handleApproveResearchAndScript} updateProject={updateProject} loading={loading} t={t} scriptStep={scriptStep} writerLogsEndRef={writerLogsEndRef} role={role} isLongFormat={isLongFormat}/></AgentViewWrapper>;
+  if (role === AgentRole.SCRIPTWRITER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><WriterView project={project} handleImportScript={handleImportScript} handleExportScript={handleExportScript} handleApproveResearchAndScript={handleApproveResearchAndScript} handleForceExtractCast={handleForceExtractCast} updateProject={updateProject} loading={loading} t={t} scriptStep={scriptStep} writerLogsEndRef={writerLogsEndRef} role={role} isLongFormat={isLongFormat}/></AgentViewWrapper>;
   if (role === AgentRole.VOICE_ACTOR) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><VoiceView project={project} handleUpdateCharacterVoice={handleUpdateCharacterVoice} handleVerifyVoice={handleVerifyVoice} applyVoiceSuggestion={applyVoiceSuggestion} voiceAnalysis={voiceAnalysis} analyzingVoiceId={analyzingVoiceId} role={role} t={t} availableVoices={AVAILABLE_VOICES}/></AgentViewWrapper>;
   if (role === AgentRole.ARCHIVIST) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><div className="max-w-7xl mx-auto w-full px-8 pb-8"><div className="flex items-center justify-between mb-8"><div className="flex items-center gap-6"><img src={AGENTS[role].avatar} className="w-16 h-16 rounded-full border-2 border-gray-200 dark:border-gray-600 shadow-md" /><div><h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('role.archivist')}</h2><p className="text-gray-500 dark:text-gray-400">Secure textual storage.</p></div></div></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{library.map((p) => (<div key={p.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 hover:border-gray-300 dark:hover:border-gray-600 transition-all group flex flex-col h-64 relative shadow-sm hover:shadow-md"><h3 className="font-bold text-lg text-gray-800 dark:text-gray-100 mb-1 line-clamp-1">{p.title}</h3><div className="flex gap-2 mt-auto"><button onClick={() => handleLoadProject(p)} className="flex-1 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"><Briefcase className="w-4 h-4"/> {t('ui.upload')}</button><button onClick={() => handleDeleteFromLibrary(p.id!)} className="px-3 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 rounded-lg transition-colors border border-red-200 dark:border-red-900"><RefreshCw className="w-4 h-4"/></button></div></div>))}</div></div></AgentViewWrapper>;
   if (role === AgentRole.CHARACTER_DESIGNER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><CharacterDesignerView project={project} handleFinishCharacterDesign={handleFinishCharacterDesign} handleRegenerateSingleCharacter={handleRegenerateSingleCharacter} handleGenerateAllCharacters={handleGenerateAllCharacters} handleUpdateCharacterDescription={handleUpdateCharacterDescription} handleUpdateCharacterVoice={handleUpdateCharacterVoice} toggleCharacterLock={toggleCharacterLock} handleCharacterUpload={handleCharacterUpload} handleCheckConsistency={handleCheckConsistency} handleSelectCharacterVariant={handleSelectCharacterVariant} role={role} t={t} availableVoices={AVAILABLE_VOICES} loading={loading} /></AgentViewWrapper>;
