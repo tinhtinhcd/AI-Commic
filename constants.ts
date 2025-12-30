@@ -139,6 +139,9 @@ export const TRANSLATIONS = {
         'style.photoreal': 'Photorealistic (Cinematic)',
         'style.cultivation': 'Cultivation',
         'style.modern_sol': 'Slice of Life',
+        'style.gothic': 'Gothic Horror',
+        'style.steampunk': 'Steampunk',
+        'style.art_nouveau': 'Fantasy Art Nouveau',
         'tone.standard': 'Standard',
         'tone.humor': 'Humor',
         'tone.dark': 'Dark',
@@ -293,6 +296,9 @@ export const TRANSLATIONS = {
         'style.photoreal': 'Ảnh Thực (Điện Ảnh)',
         'style.cultivation': 'Tiên Hiệp',
         'style.modern_sol': 'Đời thường (Việt Nam)',
+        'style.gothic': 'Kinh dị Gothic',
+        'style.steampunk': 'Steampunk (Hơi nước)',
+        'style.art_nouveau': 'Art Nouveau (Tân Nghệ Thuật)',
         'tone.standard': 'Tiêu chuẩn',
         'tone.humor': 'Hài hước',
         'tone.dark': 'U tối',
@@ -447,4 +453,3 @@ export const INITIAL_PROJECT_STATE: ComicProject = {
   workflowStage: WorkflowStage.IDLE,
   logs: []
 };
-    

@@ -193,30 +193,29 @@ export const generatePanelImage = async (panel: ComicPanel, styleGuide: string, 
     return imageUrl;
 };
 
-// ... (Other functions: generatePanelVideo, summarizeChapter, generateVoiceover, etc. remain mostly the same, but using updated types)
-// Re-exporting them to ensure file integrity
 export const generatePanelVideo = async (panel: ComicPanel, style: string): Promise<string> => {
     if (!panel.imageUrl) return '';
     const ai = getAI();
     const base64Data = panel.imageUrl.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
-    try {
-        let operation = await ai.models.generateVideos({
-            model: 'veo-3.1-fast-generate-preview', 
-            prompt: `Cinematic motion for a comic panel. ${style} style. ${panel.description}. Subtle movement, parallax effect, atmospheric.`,
-            image: { imageBytes: base64Data, mimeType: 'image/png' },
-            config: { numberOfVideos: 1, aspectRatio: '16:9', resolution: '720p' }
-        });
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 5000)); 
-            operation = await ai.operations.getVideosOperation({operation: operation});
-        }
-        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (videoUri) {
-            const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
-            const blob = await response.blob();
-            return URL.createObjectURL(blob);
-        }
-    } catch (e) { console.error("Veo generation failed", e); }
+    
+    // Note: Veo model requires a paid API key. 
+    // If this call fails with 404/Not Found, it usually means the key is invalid for Veo.
+    let operation = await ai.models.generateVideos({
+        model: 'veo-3.1-fast-generate-preview', 
+        prompt: `Cinematic motion for a comic panel. ${style} style. ${panel.description}. Subtle movement, parallax effect, atmospheric.`,
+        image: { imageBytes: base64Data, mimeType: 'image/png' },
+        config: { numberOfVideos: 1, aspectRatio: '16:9', resolution: '720p' }
+    });
+    while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); 
+        operation = await ai.operations.getVideosOperation({operation: operation});
+    }
+    const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (videoUri) {
+        const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
+        const blob = await response.blob();
+        return URL.createObjectURL(blob);
+    }
     return '';
 };
 
@@ -253,18 +252,19 @@ export const analyzeCharacterConsistency = async (imageBase64: string, targetSty
     return cleanAndParseJSON(response.text!);
 };
 
+// IMPROVED VOICE VERIFICATION
 export const verifyCharacterVoice = async (character: Character, voiceName: string): Promise<{ isSuitable: boolean; suggestion: string; reason: string }> => {
     const ai = getAI();
     const VOICE_DESCRIPTIONS = `
-        - Puck: Energetic, youthful, mischievous, higher pitch (Male). Good for protagonists, kids, or tricksters.
-        - Charon: Deep, gravelly, authoritative, low pitch (Male). Good for villains, mentors, or tough guys.
-        - Kore: Soft, soothing, calm, feminine (Female). Good for nurturing characters, mystics, or gentle leads.
-        - Fenrir: Intense, aggressive, rough, growly (Male). Good for warriors, monsters, or angry characters.
-        - Zephyr: Balanced, neutral, clear, breezy (Female/Androgynous). Good for narrators, professionals, or smart characters.
+        - Puck: Male, High pitch, Energetic, Youthful, Mischievous. Archetype: The Hero / The Sidekick.
+        - Charon: Male, Low pitch, Deep, Gravelly, Authoritative. Archetype: The Villain / The Mentor / The Monster.
+        - Kore: Female, Soft, Soothing, Calm, Gentle. Archetype: The Healer / The Mother / The Innocent.
+        - Fenrir: Male, Rough, Aggressive, Intense, Growly. Archetype: The Warrior / The Beast / The Anti-Hero.
+        - Zephyr: Female/Androgynous, Balanced, Neutral, Clear, Professional. Archetype: The Narrator / The Intellect / The Robot.
     `;
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: PROMPTS.voiceConsistency(character.name, character.role, character.personality || character.description, voiceName, VOICE_DESCRIPTIONS),
+        contents: PROMPTS.voiceConsistency(character.name, character.role || 'Unknown', character.personality || character.description, voiceName, VOICE_DESCRIPTIONS),
         config: { responseMimeType: "application/json" }
     });
     return cleanAndParseJSON(response.text!);

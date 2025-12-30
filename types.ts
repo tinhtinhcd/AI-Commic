@@ -45,11 +45,19 @@ export interface ComicPanel {
   duration?: number;
 }
 
+export interface CharacterVariant {
+  id: string;
+  imageUrl: string;
+  style: string;
+  timestamp: number;
+}
+
 export interface Character {
   id: string;
   name: string;
   description: string;
   imageUrl?: string;
+  variants?: CharacterVariant[]; // History of designs
   voice?: string; 
   isGenerating?: boolean;
   isLocked?: boolean;

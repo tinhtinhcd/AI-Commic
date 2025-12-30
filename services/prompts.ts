@@ -64,6 +64,9 @@ export const PROMPTS = {
         - If Style is "Manga", describe inking, screen tones (if B&W), or vibrant coloring (if Color), and dynamic paneling typical of Manga.
         - If Style is "2D Animation" or "Anime", describe cel-shading, line weight, and compositing to look like a frame from a show.
         - If Style is "3D Animation", describe lighting (e.g. subsurface scattering), texture quality, and rendering style (Pixar-esque vs Realistic).
+        - If Style is "Gothic Horror", focus on deep shadows, high contrast (chiaroscuro), Victorian aesthetics, and a gloomy, oppressive atmosphere.
+        - If Style is "Steampunk", emphasize brass, copper, gears, steam-powered machinery mixed with Victorian fashion, and sepia or warm metallic tones.
+        - If Style is "Fantasy Art Nouveau", highlight intricate organic lines, floral borders, stained-glass aesthetics (Mucha style), and soft, harmonious colors.
         - If Cultural Setting is "Vietnam", describe Vietnamese facial features, common architectural details, and fashion nuances to avoid looking "Western" or "Generic Asian".
         
         Output a plain text paragraph (in ${language}) that can be used as a system instruction for an artist AI.
@@ -84,25 +87,48 @@ export const PROMPTS = {
         2. Ensure the character's ethnicity and fashion matches the 'World Setting' and 'Name' (e.g. Vietnamese name -> Vietnamese features).
         3. Do NOT use Western comic tropes (like Superman muscles) unless specified.
         4. Focus on facial features, skin tone, hair texture, and culturally accurate clothing.
+        5. CRITICAL: Request a dynamic, personality-driven pose (avoid static T-poses) and a specific facial expression that conveys their archetype (e.g. confident smirk, shy glance, fierce shout).
     `,
 
     characterImagePrompt: (name: string, description: string, styleGuide: string) => `
         Generate a character design for: ${name}.
         Visual Description: ${description}
         Art Style: ${styleGuide}
-        Full body character design sheet, white background, high quality.
+        Full body character design sheet, dynamic pose, expressive face, interesting angle, white background, high quality.
     `,
 
     // 5. Panel Art - Uses Style Guide & Setting
     panelImagePrompt: (styleGuide: string, description: string, charDesc: string, worldSetting: string) => `
-        Create a comic panel image prompt.
+        Generate a professional comic book panel.
+
+        **SCENE CONTEXT:**
+        - **Art Style:** ${styleGuide}
+        - **Setting:** ${worldSetting} (Authentic architecture/props required).
+        - **Characters:** ${charDesc}
+        - **Action/Moment:** ${description}
+
+        **VISUAL STORYTELLING DIRECTIVES (MANDATORY):**
         
-        - Visual Style: ${styleGuide}
-        - Environment/Location: ${worldSetting} (Ensure architecture, streets, and props match this location accurately).
-        - Action: ${description}
-        - Characters: ${charDesc}
+        1. **DYNAMIC CAMERA ANGLE:** 
+           - *Never* use a flat, eye-level shot unless it's a passport photo.
+           - *Select one:* Low Angle (Heroic/Dominant), High Angle (Vulnerable/Establishing), Dutch Tilt (Unease/Action), Over-the-Shoulder (Intimate), or Worm's Eye (Grand scale).
         
-        Avoid generic Western backgrounds if the setting is specific (e.g. Vietnam). Use specific architectural details (e.g. motorbikes, narrow tube houses for Vietnam).
+        2. **COMPOSITION & DEPTH:**
+           - Use **Foreground Elements** (blurred or dark) to frame the subject and create depth.
+           - Use **Leading Lines** (roads, fences, limbs) to point to the focal point.
+           - Rule of Thirds or Golden Ratio placement.
+        
+        3. **SHOT TYPE VARIETY:**
+           - If detailing emotion: **Extreme Close-Up** (eyes/mouth).
+           - If showing action: **Dynamic Full Shot** with foreshortening.
+           - If establishing location: **Wide Shot** with atmospheric perspective.
+        
+        4. **LIGHTING MOOD:**
+           - Use dramatic lighting: Rim light, Chiaroscuro (high contrast), Volumetric shafts of light, or Neon glow.
+           - Shadows should define the volume of the scene.
+
+        **OUTPUT INSTRUCTION:**
+        Render this image as a finished, high-fidelity comic panel or anime screenshot. The composition must be bold and cinematic.
     `,
 
     // 6. Scripting
@@ -146,7 +172,22 @@ export const PROMPTS = {
     
     voiceConsistency: (name: string, role: string, desc: string, voice: string, list: string) => `Check if voice '${voice}' fits character '${name}' (${role}, ${desc}). List: ${list}. JSON: { isSuitable, suggestion, reason }`,
     
-    analyzeConsistency: (charName: string, style: string) => `Analyze image for style consistency with '${style}'. Character: ${charName}. JSON: { isConsistent, critique }`,
+    analyzeConsistency: (charName: string, style: string) => `
+        Act as an Art Director. Evaluate the generated character image for "${charName}" against the target style "${style}".
+        
+        Criteria:
+        1. Style Match: Does the image adhere to the visual techniques of "${style}" (e.g. cel-shading for Anime, screen tones for Manga, realistic lighting for Photoreal)?
+        2. Anatomy & Quality: Are there severe deformities (extra fingers, distorted face) or artifacts?
+        3. Character Fidelity: Is the character coherent?
+        
+        Strictly flag 'isConsistent: false' if the style is wrong OR if anatomy is significantly broken.
+        
+        Return JSON:
+        {
+            "isConsistent": boolean,
+            "critique": "Short actionable feedback (< 20 words)."
+        }
+    `,
     
     summarizeChapter: (text: string) => `Summarize in 3 sentences: ${text}`
 };
