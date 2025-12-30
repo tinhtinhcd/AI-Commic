@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ComicProject, WorkflowStage, ChapterArchive } from '../types';
 import { AGENTS } from '../constants';
@@ -42,7 +43,6 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
     if (!project.storyFormat) {
         return (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                {/* ... (Existing Dashboard Code) ... */}
                 <div>
                    <div className="flex justify-between items-center mb-4">
                        <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2"><Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400"/> {t('ui.resume')}</h3>
@@ -54,7 +54,7 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm hover:shadow-md transition-all relative group cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-500" onClick={() => handleLoadWIP(slotProject)}>
                                    <div className="flex justify-between items-start mb-3">
                                        <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">{slotProject.storyFormat?.replace('_', ' ')}</span>
-                                       <button onClick={(e) => handleDeleteWIP(e, slotProject.id!)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 p-1 z-20 transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                       <button onClick={(e) => handleDeleteWIP(e, slotProject.id!)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 p-1 z-20 transition-colors bg-white dark:bg-gray-700 rounded-full border border-transparent hover:border-red-200 dark:hover:border-red-900 shadow-sm"><Trash2 className="w-4 h-4"/></button>
                                    </div>
                                    <h4 className="font-bold text-lg text-gray-800 dark:text-gray-100 truncate mb-1">{slotProject.title || "Untitled Project"}</h4>
                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-6">{t('ui.last_edited')}: {new Date(slotProject.lastModified || Date.now()).toLocaleDateString()}</p>
@@ -274,26 +274,20 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
         );
     }
 
-    // SETTINGS VIEW (Replaced existing code logic but kept UI)
+    // SETTINGS VIEW 
     if (activeTab === 'SETTINGS') {
         return (
-            <div className="flex flex-col lg:flex-row gap-8 h-full pb-8">
-                {/* ... (Keep existing Settings Layout but wrapper with tab render) ... */}
-                <div className="w-full flex flex-col h-full">
-                    {renderTabs()}
-                    {/* Just re-using the settings form code from before here for brevity in this specific output, 
-                        in reality I would copy the full settings form block here. 
-                        For this XML update, I will output the FULL content including the settings form to be safe.
-                    */}
+            <div className="flex flex-col h-full pb-8">
+                {renderTabs()}
+                <div className="w-full flex flex-col h-full overflow-hidden">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm flex-1 overflow-y-auto">
-                        {/* ... Settings Content ... */}
                         <div className="space-y-6 max-w-2xl">
                             <div>
                                 <label className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-2 block">{t('manager.theme')}</label>
                                 <textarea
                                     value={project.theme || inputText}
                                     onChange={(e) => { setInputText(e.target.value); updateProject({ theme: e.target.value }); }}
-                                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-sm text-gray-900 dark:text-gray-100 min-h-[100px] outline-none"
+                                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-sm text-gray-900 dark:text-gray-100 min-h-[100px] outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900"
                                 />
                             </div>
                             <div>
@@ -309,14 +303,24 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                 </div>
                                 <div className="flex gap-2">
                                     {supportedLanguages.filter(l => !project.targetLanguages?.includes(l)).map(lang => (
-                                        <button key={lang} onClick={() => handleAddLanguage(lang)} className="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700">{lang}</button>
+                                        <button key={lang} onClick={() => handleAddLanguage(lang)} className="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 dark:text-gray-300">{lang}</button>
                                     ))}
                                 </div>
                             </div>
-                            <div className="border-t border-gray-100 dark:border-gray-700 pt-6 mt-2">
-                                <button onClick={handleExportProjectZip} className="flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs font-bold py-3 px-6 rounded-xl transition-colors border border-gray-200 dark:border-gray-600">
+                            
+                            <div className="border-t border-gray-100 dark:border-gray-700 pt-6 mt-2 flex flex-col gap-3">
+                                <button onClick={handleExportProjectZip} className="w-full flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs font-bold py-3 px-6 rounded-xl transition-colors border border-gray-200 dark:border-gray-600">
                                     <Archive className="w-4 h-4"/> {t('ui.export_zip_btn')}
                                 </button>
+                                
+                                {project.id && (
+                                    <button 
+                                        onClick={(e) => handleDeleteWIP(e, project.id!)} 
+                                        className="w-full flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-bold py-3 px-6 rounded-xl transition-colors border border-red-200 dark:border-red-800"
+                                    >
+                                        <Trash2 className="w-4 h-4"/> {t('manager.delete')} Project
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

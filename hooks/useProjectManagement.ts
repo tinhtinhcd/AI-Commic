@@ -14,10 +14,27 @@ export const useProjectManagement = (
     const [activeProjects, setActiveProjects] = useState<ComicProject[]>([]);
     const [library, setLibrary] = useState<ComicProject[]>([]);
 
+    // Initial Load
     useEffect(() => {
-        setActiveProjects(StorageService.getActiveProjects());
-        setLibrary(StorageService.getLibrary());
+        const loadData = async () => {
+            try {
+                const actives = await StorageService.getActiveProjects();
+                const libs = await StorageService.getLibrary();
+                setActiveProjects(actives);
+                setLibrary(libs);
+            } catch (e) {
+                console.error("Failed to load DB", e);
+            }
+        };
+        loadData();
     }, []);
+
+    const refreshLists = async () => {
+        const actives = await StorageService.getActiveProjects();
+        const libs = await StorageService.getLibrary();
+        setActiveProjects(actives);
+        setLibrary(libs);
+    };
 
     const addLog = (agentId: AgentRole, message: string, type: SystemLog['type'] = 'info') => {
         const newLog: SystemLog = {
@@ -27,20 +44,31 @@ export const useProjectManagement = (
             timestamp: Date.now(),
             type
         };
-        updateProject({ logs: [...project.logs, newLog] });
+        updateProject({ logs: [...(project.logs || []), newLog] });
     };
 
-    const handleSaveWIP = () => {
+    const handleSaveWIP = async () => {
         setSaveStatus('SAVING');
-        const result = StorageService.saveWorkInProgress(project);
-        if (result.success) {
-            setSaveStatus('SAVED');
-            addLog(AgentRole.PROJECT_MANAGER, result.message === 'SAVED_WITHOUT_MEDIA' ? "Project Saved (Media stripped due to size)" : "Project Saved Successfully.", 'success');
-            setActiveProjects(StorageService.getActiveProjects());
-            setTimeout(() => setSaveStatus('IDLE'), 2000);
-        } else {
+        try {
+            const result = await StorageService.saveWorkInProgress(project);
+            if (result.success) {
+                setSaveStatus('SAVED');
+                addLog(AgentRole.PROJECT_MANAGER, "Project Saved to Database.", 'success');
+                await refreshLists();
+                setTimeout(() => setSaveStatus('IDLE'), 2000);
+            } else {
+                setSaveStatus('ERROR');
+                if (result.message === 'SLOTS_FULL') {
+                    alert("Dashboard Slots Full (Max 3). Delete an old project to save a new one.");
+                } else if (result.message === 'DISK_FULL') {
+                    alert("Disk Full! Your device is running out of storage space.");
+                } else {
+                    alert("Save failed: " + result.message);
+                }
+            }
+        } catch (e) {
             setSaveStatus('ERROR');
-            alert("Storage Full");
+            console.error(e);
         }
     };
 
@@ -51,18 +79,29 @@ export const useProjectManagement = (
         }
     };
 
-    const handleDeleteWIP = (e: React.MouseEvent, id: string) => {
+    const handleDeleteWIP = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        if (confirm("Delete this project?")) {
-            StorageService.deleteActiveProject(id);
-            setActiveProjects(StorageService.getActiveProjects());
+        if (confirm("Delete this project permanently? This action cannot be undone.")) {
+            await StorageService.deleteActiveProject(id);
+            await refreshLists();
+
+            if (project.id === id) {
+                const resetState = JSON.parse(JSON.stringify(INITIAL_PROJECT_STATE));
+                updateProject({
+                    ...resetState,
+                    id: crypto.randomUUID(),
+                    logs: [] 
+                });
+                addLog(AgentRole.PROJECT_MANAGER, "Current project deleted. Workspace reset.", 'warning');
+            } else {
+                addLog(AgentRole.PROJECT_MANAGER, "Project removed from database.", 'info');
+            }
         }
     };
 
-    // Fixed: Added handleDeleteFromLibrary to hook to manage library state internally
-    const handleDeleteFromLibrary = (id: string) => {
+    const handleDeleteFromLibrary = async (id: string) => {
         if (confirm("Permanently delete this archived project?")) {
-            StorageService.deleteProjectFromLibrary(id);
+            await StorageService.deleteProjectFromLibrary(id);
             setLibrary(prev => prev.filter(p => p.id !== id));
         }
     };
@@ -93,16 +132,21 @@ export const useProjectManagement = (
         addLog(AgentRole.PROJECT_MANAGER, "Unzipping and restoring project...", 'info');
         try {
             const loadedProject = await StorageService.importProjectFromZip(file);
-            const saveResult = StorageService.saveWorkInProgress(loadedProject);
+            const saveResult = await StorageService.saveWorkInProgress(loadedProject);
+            
             if (!saveResult.success) {
-                if (confirm("Storage is full. Load into Workspace anyway?")) {
-                    updateProject(loadedProject);
-                    addLog(AgentRole.PROJECT_MANAGER, "Project loaded (Not Saved).", 'warning');
+                if (saveResult.message === 'SLOTS_FULL') {
+                    if(confirm("Dashboard slots are full. Load into temporary workspace only? (Will NOT be saved)")) {
+                         updateProject(loadedProject);
+                         addLog(AgentRole.PROJECT_MANAGER, "Project loaded temporarily.", 'warning');
+                    }
+                } else {
+                    alert("Could not save imported project: " + saveResult.message);
                 }
             } else {
                 updateProject(loadedProject);
-                setActiveProjects(StorageService.getActiveProjects());
-                addLog(AgentRole.PROJECT_MANAGER, "Project restored and saved.", 'success');
+                await refreshLists();
+                addLog(AgentRole.PROJECT_MANAGER, "Project restored and saved to Database.", 'success');
             }
         } catch (e: any) {
             console.error(e);
@@ -162,7 +206,7 @@ export const useProjectManagement = (
         handleSaveWIP,
         handleLoadWIP,
         handleDeleteWIP,
-        handleDeleteFromLibrary, // Fixed: Exported new handler
+        handleDeleteFromLibrary,
         handleExportProjectZip,
         handleImportProjectZip,
         switchProjectLanguage,
