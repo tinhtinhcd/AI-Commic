@@ -13,6 +13,7 @@ export const TypesetterView: React.FC<{
     role: AgentRole;
     t: (k: string) => string;
 }> = ({ project, handleFinishPrinting, role, t }) => {
+    const panels = project.panels || [];
     return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-24">
              <div className="flex items-center justify-between mb-8">
@@ -31,11 +32,11 @@ export const TypesetterView: React.FC<{
             <div className="bg-gray-100 dark:bg-gray-800 p-8 rounded-xl overflow-x-auto border border-gray-200 dark:border-gray-700">
                  <div className="flex gap-8 min-w-max">
                      {/* Simulating Pages - Grouping panels into pages of 4 for visualization */}
-                     {Array.from({ length: Math.ceil(project.panels.length / 4) }).map((_, pageIdx) => (
+                     {Array.from({ length: Math.ceil(panels.length / 4) }).map((_, pageIdx) => (
                          <div key={pageIdx} className="w-[400px] h-[600px] bg-white shadow-2xl flex flex-col relative shrink-0 border border-gray-200">
                              <div className="absolute -top-6 left-0 font-bold text-gray-500 dark:text-gray-400 text-xs">Page {pageIdx + 1}</div>
                              <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-1 p-4">
-                                 {project.panels.slice(pageIdx * 4, (pageIdx + 1) * 4).map((panel) => (
+                                 {panels.slice(pageIdx * 4, (pageIdx + 1) * 4).map((panel) => (
                                      <div key={panel.id} className="relative border border-gray-900 bg-gray-100 overflow-hidden">
                                           {panel.imageUrl && <img src={panel.imageUrl} className="w-full h-full object-cover grayscale-[0.2]" />}
                                           <div className="absolute inset-0 p-2 pointer-events-none">
@@ -71,6 +72,7 @@ export const VoiceView: React.FC<{
     t: (k: string) => string;
     availableVoices: string[];
 }> = ({ project, handleUpdateCharacterVoice, handleVerifyVoice, applyVoiceSuggestion, voiceAnalysis, analyzingVoiceId, role, t, availableVoices }) => {
+    const characters = project.characters || [];
     return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-8">
             <div className="flex items-center justify-between mb-8">
@@ -84,7 +86,7 @@ export const VoiceView: React.FC<{
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {project.characters.map((char, idx) => {
+                {characters.map((char, idx) => {
                     const analysis = voiceAnalysis[char.id];
                     return (
                         <div key={char.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm hover:border-pink-300 dark:hover:border-pink-500 transition-all group">
@@ -161,6 +163,7 @@ export const MotionView: React.FC<{
 }> = ({ project, handleGeneratePanelVideo, loading, role, t }) => {
      const [isCompiling, setIsCompiling] = useState(false);
      const [progress, setProgress] = useState(0);
+     const panels = project.panels || [];
 
      const handleCompileMovie = async () => {
         setIsCompiling(true);
@@ -178,7 +181,7 @@ export const MotionView: React.FC<{
                 setProgress(Math.round(progress * 100));
             });
 
-            const videoPanels = project.panels.filter(p => p.videoUrl);
+            const videoPanels = panels.filter(p => p.videoUrl);
             if (videoPanels.length === 0) {
                 alert("No generated videos to merge.");
                 return;
@@ -216,7 +219,7 @@ export const MotionView: React.FC<{
         }
      };
 
-     const hasVideos = project.panels.some(p => p.videoUrl);
+     const hasVideos = panels.some(p => p.videoUrl);
 
      return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-24">
@@ -249,7 +252,7 @@ export const MotionView: React.FC<{
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {project.panels.map((panel, idx) => (
+                {panels.map((panel, idx) => (
                     <div key={panel.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm group">
                         <div className="aspect-video bg-gray-900 relative">
                              {panel.videoUrl ? (
@@ -390,6 +393,8 @@ export const TranslatorView: React.FC<{
     t: (k: string) => string;
 }> = ({ project, updateProject, handleAddLanguage, loading, role, t }) => {
     const [newLangInput, setNewLangInput] = useState('');
+    const targetLanguages = project.targetLanguages || [];
+    const panels = project.panels || [];
 
     return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-24">
@@ -409,7 +414,7 @@ export const TranslatorView: React.FC<{
                          <Globe className="w-5 h-5 text-cyan-600"/> Languages
                      </h3>
                      <div className="space-y-3 mb-6">
-                         {project.targetLanguages.map(lang => (
+                         {targetLanguages.map(lang => (
                              <div key={lang} className="flex items-center justify-between p-3 rounded-xl border bg-cyan-50 dark:bg-cyan-900/20 border-cyan-100 dark:border-cyan-800 text-cyan-800 dark:text-cyan-300">
                                  <span className="font-bold text-sm">{lang}</span>
                                  {lang === project.masterLanguage && <span className="text-[10px] bg-white dark:bg-gray-800 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-700 font-bold uppercase text-cyan-600 dark:text-cyan-400">Master</span>}
@@ -441,11 +446,11 @@ export const TranslatorView: React.FC<{
                      <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                          <BookOpen className="w-5 h-5 text-cyan-600"/> Content Preview
                      </h3>
-                     {project.panels.length === 0 ? (
+                     {panels.length === 0 ? (
                          <div className="text-center text-gray-400 py-12 italic">No panels content to translate yet.</div>
                      ) : (
                          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                             {project.panels.map((panel, idx) => (
+                             {panels.map((panel, idx) => (
                                  <div key={panel.id} className="p-4 border border-gray-100 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                      <div className="flex items-center gap-2 mb-2">
                                          <span className="bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] font-bold px-2 py-0.5 rounded-full">Panel #{idx+1}</span>
@@ -456,7 +461,7 @@ export const TranslatorView: React.FC<{
                                              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Original ({project.masterLanguage})</label>
                                              <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">{panel.dialogue || <span className="text-gray-300 italic">No dialogue</span>}</p>
                                          </div>
-                                         {project.targetLanguages.filter(l => l !== project.masterLanguage).map(lang => (
+                                         {targetLanguages.filter(l => l !== project.masterLanguage).map(lang => (
                                              <div key={lang}>
                                                  <label className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 uppercase block mb-1">{lang}</label>
                                                  <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2 rounded border border-cyan-100 dark:border-cyan-900">{panel.translations?.[lang]?.dialogue || <span className="text-gray-300 italic">Pending...</span>}</p>

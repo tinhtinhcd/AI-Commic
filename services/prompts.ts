@@ -17,22 +17,47 @@ export const PROMPTS = {
         - worldSetting: string (BE SPECIFIC about country, era, culture. e.g. "Hanoi, Vietnam, 2024", "Fantasy world inspired by Ly Dynasty Vietnam")
         - culturalContext: string (Notes on specific cultural norms to respect)
         - chapterOutlines: array of objects { chapterNumber, summary }
+        - extractedCharacters: array of objects { name, role (MAIN/SUPPORTING), description (visuals), personality }
         - colorPalette: array of strings
         - keyThemes: array of strings
 
-        Manuscript: "${scriptContent.substring(0, 15000)}..."
+        Manuscript: "${scriptContent.substring(0, 25000)}..."
     `,
 
-    // 2. Research Chat - Cultural Awareness
+    // 2. Research Chat - Cultural Awareness & ACTIONABLE INTELLIGENCE
     researchChatSystem: (theme: string, format: string | null, language: string) => `
-        You are the Editor-in-Chief.
+        You are the Editor-in-Chief (Biên Tập Viên Chính). 
         Context: Theme="${theme}", Format="${format}".
+        Language: ${language}.
+
+        **CORE RESPONSIBILITIES:**
+        1. **Strategy:** Analyze market trends and target audience.
+        2. **Arc Planning (CRITICAL FOR LONG SERIES):** 
+           - Do NOT try to plan the entire series at once if it is long (>20 chapters).
+           - Propose breaking the story into "Arcs" (e.g., Arc 1: The Beginning, Chapters 1-10).
+           - Focus the discussion ONLY on the current Arc until it is finalized.
+        3. **Task Management (ACTIONABLE):** You have the power to assign tasks to other agents.
+
+        **COMMAND PROTOCOL (IMPORTANT):**
+        If the user asks you to create tasks, or if you decide a specific actionable step is needed for another agent, you MUST include a command block in your response.
         
-        STRICT LANGUAGE REQUIREMENT: You MUST speak in ${language}.
+        Format:
+        <<<CMD:ADD_TASK>>>
+        {
+            "role": "SCRIPTWRITER" (or CHARACTER_DESIGNER, PANEL_ARTIST, etc.),
+            "description": "Specific instruction for the agent",
+            "targetChapter": 1 (optional number)
+        }
+        <<<END_CMD>>>
+
+        Example:
+        User: "Let's start making characters."
+        You: "Agreed. I will assign the Writer to outline the cast first.
+        <<<CMD:ADD_TASK>>>{"role": "SCRIPTWRITER", "description": "Create detailed character profiles for the protagonist and antagonist."}<<<END_CMD>>>"
         
-        Goal: Discuss the story direction. 
-        Important: If the user suggests a specific culture (e.g. Vietnam), you must adapt all your advice to fit that culture's market and tropes. 
-        Do not default to Western comic tropes unless requested.
+        **BEHAVIOR:**
+        - Be proactive. Don't just chat. Make decisions.
+        - If the story is long, say: "This is a long series. Let's focus on the first Arc (Chapters 1-12) first. I will generate a roadmap for just this Arc."
     `,
 
     extractStrategy: (chatLog: string, language: string) => `
@@ -44,32 +69,29 @@ export const PROMPTS = {
         - targetAudience
         - visualStyle
         - narrativeStructure
-        - estimatedChapters
+        - estimatedChapters (Provide a number string, e.g. "50", "100". If unsure but it's a long series, default to "50").
         - worldSetting (Extract the specific location/culture discussed)
         - culturalContext (Any specific cultural notes mentioned)
         
         Chat Log: ${chatLog}
     `,
 
-    // 3. Style Research (NEW)
+    // 3. Style Research (ENHANCED FOR DISTINCTIVENESS)
     researchArtStyle: (style: string, culturalSetting: string, language: string) => `
-        Act as an Art Director. Research and define the Visual Style Guide.
+        Act as an Expert Art Director. Define the STRICT VISUAL RULES for the style: "${style}".
+        Setting: "${culturalSetting}".
         
-        Selected Style: "${style}"
-        Cultural Setting: "${culturalSetting}"
+        You must output a technical Prompt Prefix that enforces this style.
         
-        Task: Create a detailed description of how to draw this comic/animation to ensure it looks authentic to the style AND the culture.
+        CRITICAL DIFFERENTIATION GUIDE:
+        - "Manga (B&W)": Emphasize 'black and white ink', 'screentones', 'G-pen lines', 'high contrast', 'speed lines'. No colors.
+        - "Webtoon": Emphasize 'vertical scrolling composition', 'vibrant digital colors', 'soft shading', 'clean lines', 'manhwa aesthetic'.
+        - "Noir": Emphasize 'chiaroscuro', 'heavy shadows', 'high contrast', 'monochrome', 'film noir lighting'.
+        - "Anime": Emphasize 'cel-shaded', 'studio ghibli/mappa style', 'cinematic lighting', 'highly detailed backgrounds'.
+        - "3D Render": Emphasize 'Octane render', 'raytracing', 'subsurface scattering', 'unreal engine 5', 'photorealistic textures'.
+        - "Wuxia/Ink": Emphasize 'traditional chinese ink wash painting', 'watercolor textures', 'flowing lines', 'calligraphic strokes'.
         
-        Specific Instructions:
-        - If Style is "Manga", describe inking, screen tones (if B&W), or vibrant coloring (if Color), and dynamic paneling typical of Manga.
-        - If Style is "2D Animation" or "Anime", describe cel-shading, line weight, and compositing to look like a frame from a show.
-        - If Style is "3D Animation", describe lighting (e.g. subsurface scattering), texture quality, and rendering style (Pixar-esque vs Realistic).
-        - If Style is "Gothic Horror", focus on deep shadows, high contrast (chiaroscuro), Victorian aesthetics, and a gloomy, oppressive atmosphere.
-        - If Style is "Steampunk", emphasize brass, copper, gears, steam-powered machinery mixed with Victorian fashion, and sepia or warm metallic tones.
-        - If Style is "Fantasy Art Nouveau", highlight intricate organic lines, floral borders, stained-glass aesthetics (Mucha style), and soft, harmonious colors.
-        - If Cultural Setting is "Vietnam", describe Vietnamese facial features, common architectural details, and fashion nuances to avoid looking "Western" or "Generic Asian".
-        
-        Output a plain text paragraph (in ${language}) that can be used as a system instruction for an artist AI.
+        Output a plain text paragraph (in English - for the Image Generator) describing the rendering technique, lighting, line quality, and color palette.
     `,
 
     // 4. Character Design - Uses Style Guide
@@ -91,47 +113,28 @@ export const PROMPTS = {
     `,
 
     characterImagePrompt: (name: string, description: string, styleGuide: string) => `
-        Generate a character design for: ${name}.
-        Visual Description: ${description}
-        Art Style: ${styleGuide}
-        Full body character design sheet, dynamic pose, expressive face, interesting angle, white background, high quality.
+        (Masterpiece, Best Quality), ${styleGuide}.
+        Character Design Sheet for: ${name}.
+        Visuals: ${description}.
+        Full body, dynamic pose, expressive face, interesting angle, white background.
     `,
 
     // 5. Panel Art - Uses Style Guide & Setting
     panelImagePrompt: (styleGuide: string, description: string, charDesc: string, worldSetting: string) => `
-        Generate a professional comic book panel.
-
-        **SCENE CONTEXT:**
-        - **Art Style:** ${styleGuide}
+        (Masterpiece, Best Quality, Ultra Detailed), ${styleGuide}.
+        
+        **SCENE:**
+        - **Action:** ${description}
         - **Setting:** ${worldSetting} (Authentic architecture/props required).
         - **Characters:** ${charDesc}
-        - **Action/Moment:** ${description}
 
-        **VISUAL STORYTELLING DIRECTIVES (MANDATORY):**
-        
-        1. **DYNAMIC CAMERA ANGLE:** 
-           - *Never* use a flat, eye-level shot unless it's a passport photo.
-           - *Select one:* Low Angle (Heroic/Dominant), High Angle (Vulnerable/Establishing), Dutch Tilt (Unease/Action), Over-the-Shoulder (Intimate), or Worm's Eye (Grand scale).
-        
-        2. **COMPOSITION & DEPTH:**
-           - Use **Foreground Elements** (blurred or dark) to frame the subject and create depth.
-           - Use **Leading Lines** (roads, fences, limbs) to point to the focal point.
-           - Rule of Thirds or Golden Ratio placement.
-        
-        3. **SHOT TYPE VARIETY:**
-           - If detailing emotion: **Extreme Close-Up** (eyes/mouth).
-           - If showing action: **Dynamic Full Shot** with foreshortening.
-           - If establishing location: **Wide Shot** with atmospheric perspective.
-        
-        4. **LIGHTING MOOD:**
-           - Use dramatic lighting: Rim light, Chiaroscuro (high contrast), Volumetric shafts of light, or Neon glow.
-           - Shadows should define the volume of the scene.
-
-        **OUTPUT INSTRUCTION:**
-        Render this image as a finished, high-fidelity comic panel or anime screenshot. The composition must be bold and cinematic.
+        **COMPOSITION DIRECTIVES:**
+        - Use a Cinematic Angle (Low angle, Dutch tilt, or Over-the-shoulder).
+        - Dramatic Lighting consistent with the Art Style.
+        - Ensure character consistency.
     `,
 
-    // 6. Scripting
+    // 6. Scripting (UPDATED FOR DYNAMIC LENGTH)
     scriptGeneration: (
         chapterNumber: number,
         format: string | null,
@@ -144,23 +147,83 @@ export const PROMPTS = {
         worldSetting: string
     ) => `
         Write a comic script for Chapter ${chapterNumber}.
-        Format: ${format}. Style: ${style}.
-        Target Length: ${panelCount} panels.
-        World Setting: ${worldSetting}.
         
-        OUTPUT LANGUAGE: ${language}.
+        **PROJECT CONFIGURATION:**
+        - Format: ${format} (CRITICAL: Adjust pacing accordingly).
+        - Target Length: Approximately ${panelCount} panels. 
+          *NOTE: Do NOT strictly adhere to ${panelCount}. If the scene needs more panels to flow correctly (e.g. action sequences, emotional beats), add them. Use as many as needed to tell the story well, up to 1.5x the target.*
+        - Style: ${style}.
+        - Setting: ${worldSetting}.
         
-        Story Concept: ${concept}
-        Characters: ${characters}
-        Summary: ${summary}
+        **OUTPUT LANGUAGE:** ${language}.
         
-        Output JSON: { "title": "...", "panels": [ { "description": "...", "dialogue": "...", "caption": "...", "charactersInvolved": [] } ] }
+        **CONTEXT:**
+        - Concept: ${concept}
+        - Characters: ${characters}
+        - Chapter Summary: ${summary}
+        
+        **OUTPUT FORMAT:**
+        Return strictly a JSON object with this structure:
+        { 
+            "title": "Chapter Title", 
+            "panels": [ 
+                { 
+                    "description": "Visual description of the panel (camera angle, action, lighting)", 
+                    "dialogue": "Character Name: Dialogue text", 
+                    "caption": "Narrator text or Sound Effect", 
+                    "charactersInvolved": ["Name1", "Name2"] 
+                } 
+            ] 
+        }
     `,
 
     // Helpers
     storyConcept: (theme: string, style: string, language: string) => `Generate unique story concept. Theme: ${theme}. Style: ${style}. Output JSON in ${language}: { premise, similarStories, uniqueTwist, genreTrends }`,
     
-    complexCharacters: (premise: string, language: string, setting: string) => `Create character cast for: ${premise}. Setting: ${setting}. Output JSON in ${language}: [ { name, role, personality, description } ]. Names must fit the setting.`,
+    // MODIFIED: Supports creation from scratch
+    complexCharacters: (premise: string, language: string, setting: string) => `
+        Create a cast of characters for a story with this premise: "${premise}".
+        Setting: "${setting}".
+        
+        OUTPUT RULES:
+        1. Output strictly valid JSON array.
+        2. Language: ${language}.
+        
+        JSON Structure: 
+        [ 
+            { 
+                "name": "Name", 
+                "role": "MAIN / SUPPORTING / ANTAGONIST", 
+                "personality": "Short personality traits", 
+                "description": "Visual description (hair, eyes, clothes, distinguishing features)" 
+            } 
+        ]
+    `,
+
+    // NEW: Supports extraction from existing script
+    extractCharactersFromText: (sourceText: string, language: string) => `
+        Analyze the following story text/script.
+        Identify the characters present in the text.
+        
+        OUTPUT RULES:
+        1. Extract names directly from the text. Do not invent characters not mentioned.
+        2. Infer visual descriptions based on the text context (or create fitting ones if not described).
+        3. Output strictly valid JSON array.
+        4. Language for descriptions: ${language}.
+
+        JSON Structure: 
+        [ 
+            { 
+                "name": "Name", 
+                "role": "MAIN / SUPPORTING / ANTAGONIST", 
+                "personality": "Inferred personality", 
+                "description": "Visual description based on text" 
+            } 
+        ]
+
+        Text Source (Excerpt):
+        "${sourceText.substring(0, 30000)}..."
+    `,
     
     seriesBible: (theme: string, style: string, language: string) => `Write Series Bible. Theme: ${theme}. Output JSON in ${language}: { worldSetting, mainConflict, characterArcs }`,
 

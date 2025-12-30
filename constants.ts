@@ -89,6 +89,7 @@ export const TRANSLATIONS = {
         'manager.lang': 'Master Lang',
         'manager.target_langs': 'Languages',
         'manager.style': 'Art Style',
+        'manager.image_engine': 'Artist Engine',
         'manager.format': 'Format',
         'manager.pub_type': 'Publication Type',
         'manager.select_format': 'Select Pipeline',
@@ -246,6 +247,7 @@ export const TRANSLATIONS = {
         'manager.lang': 'Ngôn ngữ Gốc',
         'manager.target_langs': 'Đa Ngôn Ngữ',
         'manager.style': 'Phong cách Vẽ',
+        'manager.image_engine': 'Công cụ Vẽ (AI Model)',
         'manager.format': 'Quy mô',
         'manager.pub_type': 'Loại Ấn Phẩm (Book Type)',
         'manager.select_format': 'Chọn Quy Trình',
@@ -431,6 +433,7 @@ export const INITIAL_PROJECT_STATE: ComicProject = {
   storyFormat: null,
   publicationType: 'COMIC', // Default
   modelTier: 'STANDARD', 
+  imageModel: 'gemini-2.5-flash-image', // DEFAULT TO FAST
   totalChapters: '', 
   currentChapter: 1,
   targetPanelCount: 20, 

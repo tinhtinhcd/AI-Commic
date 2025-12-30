@@ -4,7 +4,7 @@ import { AgentRole, ComicProject, ComicPanel, Character, WorkflowStage, SystemLo
 import { AGENTS, TRANSLATIONS, INITIAL_PROJECT_STATE } from '../constants';
 import * as GeminiService from '../services/geminiService';
 import * as StorageService from '../services/storageService';
-import { Send, RefreshCw, CheckCircle, Loader2, Sparkles, UserPlus, BookOpen, Users, Megaphone, Video, Palette, Save, Globe, TrendingUp, ShieldAlert, Archive, Briefcase, ChevronRight, Printer, ListTodo, Lock } from 'lucide-react';
+import { Send, RefreshCw, CheckCircle, Loader2, Sparkles, UserPlus, BookOpen, Users, Megaphone, Video, Palette, Save, Globe, TrendingUp, ShieldAlert, Archive, Briefcase, ChevronRight, Printer, ListTodo, Lock, Layers, Split } from 'lucide-react';
 import { ManagerView } from './ManagerView';
 import { ResearchView, WriterView, CharacterDesignerView, PanelArtistView } from './CreativeViews';
 import { VoiceView, MotionView, TypesetterView, ContinuityView, CensorView, TranslatorView } from './ProductionViews';
@@ -56,27 +56,33 @@ const createSystemTask = (role: AgentRole, desc: string, chapter?: number): Agen
     targetChapter: chapter
 });
 
-// --- HELPER FOR GENERATING TASKS ---
-const generateSystemTasks = (totalChapters: number, currentChapter: number): AgentTask[] => {
+// --- HELPER FOR GENERATING TASKS (UPDATED FOR LONG SERIES) ---
+const generateSystemTasks = (totalChapters: number, currentChapter: number, isLongFormat: boolean): AgentTask[] => {
     const tasks: AgentTask[] = [];
 
     // 1. PROJECT MANAGER TASKS (High Level)
     tasks.push(createSystemTask(AgentRole.PROJECT_MANAGER, `Review & Approve Strategy`));
-    for (let i = 1; i <= totalChapters; i++) {
-        tasks.push(createSystemTask(AgentRole.PROJECT_MANAGER, `Supervise production of Chapter ${i}`, i));
+    
+    // For long series, we generate a "Master Checklist"
+    if (totalChapters > 0) {
+        for (let i = 1; i <= totalChapters; i++) {
+            tasks.push(createSystemTask(AgentRole.PROJECT_MANAGER, `Supervise production of Chapter ${i}`, i));
+        }
     }
+    
     tasks.push(createSystemTask(AgentRole.PROJECT_MANAGER, `Final Series Review`));
 
-    // 2. SCRIPTWRITER TASKS
+    // 2. INITIAL SCRIPTING TASKS (Only for current context to avoid 1000s of tasks)
     tasks.push(createSystemTask(AgentRole.SCRIPTWRITER, `Develop Story Concepts`));
     tasks.push(createSystemTask(AgentRole.SCRIPTWRITER, `Define Character Cast`));
-    for (let i = 1; i <= totalChapters; i++) {
+    
+    // We only generate granular creative tasks for the *immediate* future chapters (e.g., current + next 2)
+    // to keep the UI clean, while the Manager has the full list.
+    const lookahead = isLongFormat ? 2 : totalChapters; 
+    
+    for (let i = currentChapter; i <= Math.min(totalChapters, currentChapter + lookahead); i++) {
         tasks.push(createSystemTask(AgentRole.SCRIPTWRITER, `Write Script for Chapter ${i}`, i));
-    }
-
-    // 3. ARTIST TASKS
-    tasks.push(createSystemTask(AgentRole.CHARACTER_DESIGNER, `Create Character Sheets`));
-    for (let i = 1; i <= totalChapters; i++) {
+        tasks.push(createSystemTask(AgentRole.CHARACTER_DESIGNER, `Review Cast for Chapter ${i}`, i));
         tasks.push(createSystemTask(AgentRole.PANEL_ARTIST, `Draw Panels for Chapter ${i}`, i));
     }
 
@@ -114,7 +120,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   const projectRef = useRef(project);
 
   const t = (key: string) => (TRANSLATIONS[uiLanguage] as any)[key] || key;
-  const isLongFormat = project.storyFormat === 'LONG_SERIES' || project.storyFormat === 'EPISODIC';
+  const isLongFormat = project.storyFormat === 'LONG_SERIES' || project.storyFormat === 'EPISODIC' || project.publicationType === 'NOVEL';
 
   const { 
       saveStatus, activeProjects, library, 
@@ -128,8 +134,8 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
     if (role === AgentRole.PROJECT_MANAGER) logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     if (role === AgentRole.SCRIPTWRITER && loading) writerLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     if (role === AgentRole.MARKET_RESEARCHER) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    if (role === AgentRole.SCRIPTWRITER && project.panels.length > 0) setScriptStep('WRITING');
-  }, [project.logs, role, project.panels.length, loading]);
+    if (role === AgentRole.SCRIPTWRITER && (project.panels || []).length > 0) setScriptStep('WRITING');
+  }, [project.logs, role, project.panels, loading]);
 
   // --- INITIALIZE MANAGER TASKS IF EMPTY ---
   useEffect(() => {
@@ -140,8 +146,6 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
                   createSystemTask(AgentRole.PROJECT_MANAGER, "Set up Project Settings (Title, Language, Format)"),
                   createSystemTask(AgentRole.PROJECT_MANAGER, "Import Manuscript OR Start Research"),
                   createSystemTask(AgentRole.PROJECT_MANAGER, "Approve Story Strategy"),
-                  createSystemTask(AgentRole.PROJECT_MANAGER, "Review Final Script"),
-                  createSystemTask(AgentRole.PROJECT_MANAGER, "Approve Character Designs")
               ];
               updateProject({ agentTasks: [...(project.agentTasks || []), ...initTasks] });
           }
@@ -169,22 +173,27 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
              if ((desc.includes('import') || desc.includes('manuscript')) && project.originalScript) shouldComplete = true;
              if (desc.includes('research') && project.workflowStage !== WorkflowStage.IDLE) shouldComplete = true;
              if (desc.includes('strategy') && project.marketAnalysis) shouldComplete = true;
-             if (desc.includes('script') && getCurrentStageIndex() > getStepStageIndex(WorkflowStage.SCRIPTING)) shouldComplete = true;
-             if (desc.includes('character') && getCurrentStageIndex() > getStepStageIndex(WorkflowStage.DESIGNING_CHARACTERS)) shouldComplete = true;
+             
+             // Check if specific chapter task is done
+             if (task.targetChapter && task.targetChapter < (project.currentChapter || 1)) {
+                 shouldComplete = true;
+             }
           }
 
           if (task.role === AgentRole.SCRIPTWRITER) {
               if (desc.includes('concept') && project.storyConcept) shouldComplete = true;
-              if (desc.includes('cast') && project.characters.length > 0) shouldComplete = true;
-              if ((desc.includes('script') || desc.includes('write')) && project.panels.length > 0) shouldComplete = true;
+              if (desc.includes('cast') && (project.characters || []).length > 0) shouldComplete = true;
+              
+              // Only complete script task if panels exist AND we are past scripting stage for this chapter
+              if ((desc.includes('script') || desc.includes('write')) && (project.panels || []).length > 0 && task.targetChapter === project.currentChapter) shouldComplete = true;
           }
 
           if (task.role === AgentRole.CHARACTER_DESIGNER) {
-              if ((desc.includes('sheet') || desc.includes('design')) && project.characters.length > 0 && project.characters.every(c => c.imageUrl)) shouldComplete = true;
+              if ((desc.includes('sheet') || desc.includes('design')) && (project.characters || []).length > 0 && (project.characters || []).every(c => c.imageUrl)) shouldComplete = true;
           }
 
           if (task.role === AgentRole.PANEL_ARTIST) {
-              const allPanelsDone = project.panels.length > 0 && project.panels.every(p => p.imageUrl);
+              const allPanelsDone = (project.panels || []).length > 0 && (project.panels || []).every(p => p.imageUrl);
               if ((desc.includes('draw') || desc.includes('panel')) && allPanelsDone) shouldComplete = true;
           }
 
@@ -214,7 +223,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   };
 
   const checkApiKeyRequirement = async () => {
-    if (project.modelTier === 'PREMIUM' && (window as any).aistudio) {
+    if ((project.modelTier === 'PREMIUM' || project.imageModel === 'gemini-3-pro-image-preview') && (window as any).aistudio) {
         const hasKey = await (window as any).aistudio.hasSelectedApiKey();
         if (!hasKey) await (window as any).aistudio.openSelectKey();
     }
@@ -324,9 +333,35 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
            updateProject({ workflowStage: WorkflowStage.RESEARCHING }); setLoading(true);
            try {
                const analysis = await GeminiService.analyzeUploadedManuscript(project.originalScript, project.activeLanguage, project.modelTier || 'STANDARD');
-               updateProject({ marketAnalysis: analysis, title: analysis.suggestedTitle, theme: analysis.narrativeStructure, style: analysis.visualStyle, totalChapters: analysis.estimatedChapters });
-               const introMsg: Message = { role: 'agent', senderId: AgentRole.MARKET_RESEARCHER, content: `I have analyzed the manuscript. Strategy Form ready.`, timestamp: Date.now() };
+               
+               // EXTRACT CHARACTERS IMMEDIATELY from Analysis
+               let extractedChars: Character[] = [];
+               if (analysis.extractedCharacters && analysis.extractedCharacters.length > 0) {
+                   extractedChars = analysis.extractedCharacters.map(c => ({
+                       id: crypto.randomUUID(),
+                       name: c.name,
+                       description: c.description,
+                       personality: c.personality,
+                       role: c.role === 'MAIN' ? 'MAIN' : c.role === 'ANTAGONIST' ? 'ANTAGONIST' : 'SUPPORTING',
+                       voice: AVAILABLE_VOICES[Math.floor(Math.random() * AVAILABLE_VOICES.length)], // Auto assign random voice
+                       isGenerating: false,
+                       isLocked: false
+                   }));
+               }
+
+               updateProject({ 
+                   marketAnalysis: analysis, 
+                   title: analysis.suggestedTitle, 
+                   theme: analysis.narrativeStructure, 
+                   style: analysis.visualStyle, 
+                   totalChapters: analysis.estimatedChapters,
+                   characters: extractedChars // Save characters here!
+               });
+               
+               const introMsg: Message = { role: 'agent', senderId: AgentRole.MARKET_RESEARCHER, content: `I have analyzed the manuscript and extracted ${extractedChars.length} characters. Strategy Form ready.`, timestamp: Date.now() };
                updateProject({ researchChatHistory: [introMsg] });
+               addLog(AgentRole.MARKET_RESEARCHER, `Extracted ${extractedChars.length} characters from manuscript.`, 'success');
+
            } catch (e: any) { addLog(AgentRole.MARKET_RESEARCHER, "Failed to analyze manuscript: " + e.message, 'error'); } finally { setLoading(false); }
            return;
       }
@@ -344,13 +379,52 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   const handleResearchChatSend = async () => {
       if (!researchChatInput.trim()) return;
       const userMsg: Message = { role: 'user', content: researchChatInput, timestamp: Date.now() };
+      
       const newHistory = [...(project.researchChatHistory || []), userMsg];
       updateProject({ researchChatHistory: newHistory, workflowStage: WorkflowStage.RESEARCHING });
-      setResearchChatInput(''); setLoading(true);
+      
+      setResearchChatInput(''); 
+      setLoading(true);
+      
       try {
+          // 1. Get raw response from AI
           const aiResponseText = await GeminiService.sendResearchChatMessage(newHistory, researchChatInput, { theme: project.theme, storyFormat: project.storyFormat, totalChapters: project.totalChapters, language: project.masterLanguage, originalScript: project.originalScript }, project.modelTier || 'STANDARD');
-          updateProject({ researchChatHistory: [...newHistory, { role: 'agent', senderId: AgentRole.MARKET_RESEARCHER, content: aiResponseText, timestamp: Date.now() + 1 }] });
-      } catch (e) { addLog(AgentRole.MARKET_RESEARCHER, "Chat failed.", 'error'); } finally { setLoading(false); }
+          
+          // 2. PARSE COMMANDS: Check if the AI wants to add tasks
+          // Protocol: <<<CMD:ADD_TASK>>>{ ...json... }<<<END_CMD>>>
+          const commandRegex = /<<<CMD:ADD_TASK>>>([\s\S]*?)<<<END_CMD>>>/g;
+          let match;
+          const newTasks: AgentTask[] = [];
+          let cleanResponseText = aiResponseText;
+
+          // Loop through all matches found in the response
+          while ((match = commandRegex.exec(aiResponseText)) !== null) {
+              try {
+                  const taskData = JSON.parse(match[1]);
+                  if (taskData.role && taskData.description) {
+                      newTasks.push(createSystemTask(taskData.role as AgentRole, taskData.description, taskData.targetChapter));
+                  }
+                  // Remove the command block from the visible chat text
+                  cleanResponseText = cleanResponseText.replace(match[0], '').trim();
+              } catch (err) {
+                  console.error("Failed to parse Agent Command:", err);
+              }
+          }
+
+          // 3. Update State
+          if (newTasks.length > 0) {
+              updateProject({ agentTasks: [...(projectRef.current.agentTasks || []), ...newTasks] });
+              addLog(AgentRole.MARKET_RESEARCHER, `Agent auto-created ${newTasks.length} tasks based on discussion.`, 'success');
+              setShowTodoList(true); // Auto open todo list to show user
+          }
+
+          updateProject({ researchChatHistory: [...newHistory, { role: 'agent', senderId: AgentRole.MARKET_RESEARCHER, content: cleanResponseText, timestamp: Date.now() + 1 }] });
+          
+      } catch (e) { 
+          addLog(AgentRole.MARKET_RESEARCHER, "Chat failed.", 'error'); 
+      } finally { 
+          setLoading(false); 
+      }
   };
 
   const handleUpdateMarketAnalysis = (data: ResearchData) => {
@@ -363,16 +437,25 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           const analysis = await GeminiService.extractStrategyFromChat(project.researchChatHistory, project.masterLanguage, project.modelTier || 'STANDARD');
           const effectiveTheme = project.theme.includes("Tone:") ? project.theme : `${project.theme}. Tone: ${narrativeTone}.`;
           
-          const estimatedChapters = parseInt(analysis.estimatedChapters) || (isLongFormat ? 12 : 1);
-          const newSystemTasks = generateSystemTasks(estimatedChapters, 1);
+          // Parse chapter count carefully
+          let estimatedChapters = 1;
+          if (analysis.estimatedChapters) {
+              const match = analysis.estimatedChapters.match(/(\d+)/);
+              if (match) estimatedChapters = parseInt(match[1]);
+          } else {
+              estimatedChapters = isLongFormat ? 50 : 1;
+          }
+
+          // Generate massive checklist for Long Series
+          const newSystemTasks = generateSystemTasks(estimatedChapters, 1, isLongFormat);
           const artStyleGuide = await GeminiService.generateArtStyleGuide(analysis.visualStyle, analysis.worldSetting, project.masterLanguage, project.modelTier);
 
           const updatedProject: ComicProject = { 
               ...project, 
               marketAnalysis: analysis, 
               title: analysis.suggestedTitle, 
-              style: analysis.visualStyle,
-              artStyleGuide: artStyleGuide, 
+              style: analysis.visualStyle, 
+              artStyleGuide: artStyleGuide,
               theme: effectiveTheme + " " + analysis.narrativeStructure, 
               workflowStage: WorkflowStage.SCRIPTING, 
               id: project.id || crypto.randomUUID(),
@@ -381,97 +464,249 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           };
           
           updateProject(updatedProject);
-          addLog(AgentRole.MARKET_RESEARCHER, `Strategy Finalized. Cultural Setting: ${analysis.worldSetting}.`, 'success');
+          addLog(AgentRole.MARKET_RESEARCHER, `Strategy Finalized. Generated Roadmap for ${estimatedChapters} chapters.`, 'success');
           StorageService.saveWorkInProgress(updatedProject);
+          
+          // Ask if user wants to breakdown first chapter immediately
+          if (isLongFormat) {
+              // Trigger breakdown for Chapter 1
+              await handleBreakdownChapterTasks(1, updatedProject);
+          }
+
           setTimeout(() => onAgentChange(AgentRole.SCRIPTWRITER), 1000);
       } catch (e) { addLog(AgentRole.MARKET_RESEARCHER, "Failed to extract strategy.", 'error'); } finally { setLoading(false); }
   };
   
+  // NEW: Feature to split tasks for a specific chapter
+  const handleBreakdownChapterTasks = async (chapterNum: number, currentProjectState: ComicProject) => {
+      addLog(AgentRole.MARKET_RESEARCHER, `Breaking down tasks for Chapter ${chapterNum}...`, 'info');
+      
+      const newTasks: AgentTask[] = [
+          createSystemTask(AgentRole.SCRIPTWRITER, `[Ch ${chapterNum}] Outline High-level Beat Sheet`, chapterNum),
+          createSystemTask(AgentRole.SCRIPTWRITER, `[Ch ${chapterNum}] Draft Scene 1-3 (Opening)`, chapterNum),
+          createSystemTask(AgentRole.SCRIPTWRITER, `[Ch ${chapterNum}] Draft Scene 4-6 (Development)`, chapterNum),
+          createSystemTask(AgentRole.SCRIPTWRITER, `[Ch ${chapterNum}] Draft Scene 7-End (Climax/Ending)`, chapterNum),
+          createSystemTask(AgentRole.SCRIPTWRITER, `[Ch ${chapterNum}] Polish Dialogue & Pacing`, chapterNum),
+          createSystemTask(AgentRole.PROJECT_MANAGER, `[Ch ${chapterNum}] Review & Approve Final Script`, chapterNum)
+      ];
+
+      updateProject({ 
+          agentTasks: [...(currentProjectState.agentTasks || []), ...newTasks] 
+      });
+  };
+
   const handleGenerateConcept = async () => {
       setLoading(true); updateProject({ workflowStage: WorkflowStage.SCRIPTING }); setScriptStep('CONCEPT');
       try { const concept = await GeminiService.generateStoryConceptsWithSearch(project.theme, project.style, project.masterLanguage, project.modelTier || 'STANDARD'); updateProject({ storyConcept: concept }); setScriptStep('CASTING'); addLog(AgentRole.SCRIPTWRITER, `Concept Found: ${concept.uniqueTwist}`, 'success'); } catch (e: any) { addLog(AgentRole.SCRIPTWRITER, `Research failed: ${e.message}`, 'error'); throw e; }
   };
+  
   const handleGenerateCast = async () => {
-      if (!project.storyConcept) return; setScriptStep('CASTING');
-      try { const setting = project.marketAnalysis?.worldSetting || "Standard"; const complexChars = await GeminiService.generateComplexCharacters(project.storyConcept, project.masterLanguage, setting, project.modelTier || 'STANDARD'); const charsWithVoice = complexChars.map(c => ({ ...c, voice: AVAILABLE_VOICES[Math.floor(Math.random() * AVAILABLE_VOICES.length)] })); updateProject({ characters: charsWithVoice }); setScriptStep('WRITING'); addLog(AgentRole.SCRIPTWRITER, `Cast assembled.`, 'success'); } catch (e: any) { addLog(AgentRole.SCRIPTWRITER, `Casting failed: ${e.message}`, 'error'); throw e; }
+      // IF characters already exist (from Market Researcher phase), use them!
+      if ((project.characters || []).length > 0) {
+          addLog(AgentRole.SCRIPTWRITER, `Using ${project.characters.length} characters identified by Editorial Dept.`, 'info');
+          setScriptStep('WRITING');
+          // Ensure they all have voices
+          const charsWithVoice = project.characters.map(c => ({
+              ...c,
+              voice: c.voice || AVAILABLE_VOICES[Math.floor(Math.random() * AVAILABLE_VOICES.length)]
+          }));
+          updateProject({ characters: charsWithVoice });
+          return;
+      }
+
+      if (!project.storyConcept) return; 
+      setScriptStep('CASTING');
+      try { 
+          const setting = project.marketAnalysis?.worldSetting || "Standard"; 
+          
+          // Use originalScript if available, otherwise fall back to concept premise
+          const sourceText = project.originalScript || project.seriesBible?.characterArcs || "";
+          
+          const complexChars = await GeminiService.generateComplexCharacters(
+              project.storyConcept, 
+              project.masterLanguage, 
+              setting, 
+              project.modelTier || 'STANDARD',
+              sourceText // Pass source text for extraction
+          ); 
+          
+          const charsWithVoice = complexChars.map(c => ({ 
+              ...c, 
+              voice: AVAILABLE_VOICES[Math.floor(Math.random() * AVAILABLE_VOICES.length)] 
+          })); 
+          
+          updateProject({ characters: charsWithVoice }); 
+          setScriptStep('WRITING'); 
+          addLog(AgentRole.SCRIPTWRITER, `Cast assembled. Found ${charsWithVoice.length} characters.`, 'success'); 
+      } catch (e: any) { 
+          addLog(AgentRole.SCRIPTWRITER, `Casting failed: ${e.message}`, 'error'); 
+          throw e; 
+      }
   };
+
   const handleGenerateFinalScript = async () => {
-      setScriptStep('WRITING'); const targetChapter = project.currentChapter || 1; addLog(AgentRole.SCRIPTWRITER, `Drafting Chapter ${targetChapter}...`, 'info'); let chapterSummary = ""; if (project.marketAnalysis?.chapterOutlines) { const outline = project.marketAnalysis.chapterOutlines.find(c => c.chapterNumber === targetChapter); if (outline) chapterSummary = outline.summary; }
+      setScriptStep('WRITING'); 
+      const targetChapter = project.currentChapter || 1; 
+      
+      // DYNAMIC PANEL CALCULATION based on FORMAT
+      let dynamicPanelCount = 25; // Default for Short Story
+      if (project.storyFormat === 'EPISODIC') dynamicPanelCount = 60; // Webtoon needs length
+      if (project.storyFormat === 'LONG_SERIES') dynamicPanelCount = 45; // Manga chapter length
+      
+      addLog(AgentRole.SCRIPTWRITER, `Drafting Chapter ${targetChapter} (Target: ~${dynamicPanelCount} panels)...`, 'info'); 
+      
+      let chapterSummary = ""; 
+      if (project.marketAnalysis?.chapterOutlines) { 
+          const outline = project.marketAnalysis.chapterOutlines.find(c => c.chapterNumber === targetChapter); 
+          if (outline) chapterSummary = outline.summary; 
+      }
       try {
           if (isLongFormat && !project.seriesBible) { const bible = await GeminiService.generateSeriesBible(project.theme, project.style, project.masterLanguage, project.modelTier || 'STANDARD'); updateProject({ seriesBible: bible }); }
           const setting = project.marketAnalysis?.worldSetting;
-          const result = await GeminiService.generateScript(project.theme, project.marketAnalysis ? project.marketAnalysis.visualStyle : project.style, project.masterLanguage, project.storyFormat, project.seriesBible, project.modelTier || 'STANDARD', project.storyConcept, project.characters, chapterSummary, targetChapter, project.originalScript, setting, project.targetPanelCount);
+          const result = await GeminiService.generateScript(project.theme, project.marketAnalysis ? project.marketAnalysis.visualStyle : project.style, project.masterLanguage, project.storyFormat, project.seriesBible, project.modelTier || 'STANDARD', project.storyConcept, project.characters, chapterSummary, targetChapter, project.originalScript, setting, dynamicPanelCount);
+          
           updateProject({ title: result.title, panels: result.panels, workflowStage: WorkflowStage.CENSORING_SCRIPT });
-          addLog(AgentRole.SCRIPTWRITER, `Script Draft Complete.`, 'success');
-          setTimeout(() => onAgentChange(AgentRole.PROJECT_MANAGER), 1500);
-      } catch (e) { addLog(AgentRole.SCRIPTWRITER, "Script generation failed.", 'error'); throw e; }
+          addLog(AgentRole.SCRIPTWRITER, `Script Draft Complete (${result.panels.length} panels). Auto-starting Compliance Scan...`, 'success');
+          
+          // AUTO CENSOR TRIGGER
+          addLog(AgentRole.CENSOR, "Scanning script content...", 'info');
+          const fullText = result.panels.map((p: any) => p.description + " " + p.dialogue).join("\n");
+          const censorResult = await GeminiService.censorContent(fullText, 'SCRIPT');
+          updateProject({ censorReport: censorResult.report, isCensored: !censorResult.passed });
+
+          if (censorResult.passed) {
+               addLog(AgentRole.CENSOR, "Content passed safety checks. Auto-advancing to Character Design.", 'success');
+               updateProject({ workflowStage: WorkflowStage.DESIGNING_CHARACTERS });
+               // Auto switch to character designer
+               setTimeout(() => onAgentChange(AgentRole.CHARACTER_DESIGNER), 1000);
+          } else {
+               addLog(AgentRole.CENSOR, "Safety issues detected. Review required.", 'warning');
+               setTimeout(() => onAgentChange(AgentRole.CENSOR), 1000);
+          }
+
+      } catch (e: any) { 
+          addLog(AgentRole.SCRIPTWRITER, "Script generation failed: " + e.message, 'error'); 
+          throw e; 
+      }
   };
   const handleExportScript = () => { const dataStr = JSON.stringify(project.panels, null, 2); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', `${project.title || 'comic'}_ch${project.currentChapter || 1}_script.json`); linkElement.click(); };
   const handleImportScript = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event) => { try { const importedPanels = JSON.parse(event.target?.result as string); if (Array.isArray(importedPanels)) { updateProject({ panels: importedPanels, workflowStage: WorkflowStage.CENSORING_SCRIPT }); addLog(AgentRole.SCRIPTWRITER, `Script imported.`, 'success'); } } catch (err) {} }; reader.readAsText(file); };
   const handleApproveResearchAndScript = async () => { onAgentChange(AgentRole.SCRIPTWRITER); setLoading(true); try { await handleGenerateConcept(); await handleGenerateCast(); await handleGenerateFinalScript(); } catch (e) { console.error(e); } finally { setLoading(false); } };
   
   const handleApproveScriptAndVisualize = async () => { 
+      // Replaced by auto-transition, but kept for manual trigger
       if (project.isCensored) { alert("Script unsafe."); return; } 
-      if (isLongFormat) { 
-          const unlockedChars = project.characters.filter(c => !c.isLocked); 
-          if (unlockedChars.length > 0 && !confirm(`Warning: ${unlockedChars.length} characters are not LOCKED. Continue?`)) return; 
-      } 
-      setLoading(true); 
       updateProject({ workflowStage: WorkflowStage.DESIGNING_CHARACTERS }); 
-      addLog(AgentRole.PROJECT_MANAGER, `Script Approved. Transitioning to Character Design.`, 'info'); 
+      addLog(AgentRole.PROJECT_MANAGER, `Manually advancing to Character Design.`, 'info'); 
       onAgentChange(AgentRole.CHARACTER_DESIGNER); 
-      await checkApiKeyRequirement(); 
-      try { 
-          addLog(AgentRole.CHARACTER_DESIGNER, `Designing characters (Style: ${project.style})...`, 'info'); 
-          const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || ""; 
-          const styleGuide = project.artStyleGuide || `Style: ${project.style}`; 
-          
-          for (let i = 0; i < projectRef.current.characters.length; i++) { 
-              const currentChar = projectRef.current.characters[i]; 
-              if (currentChar.isLocked && currentChar.imageUrl) continue; 
-              
-              const charsBeforeGen = [...projectRef.current.characters]; 
-              charsBeforeGen[i] = { ...charsBeforeGen[i], isGenerating: true }; 
-              updateProject({ characters: charsBeforeGen }); 
-              
-              try { 
-                  const result = await GeminiService.generateCharacterDesign(charsBeforeGen[i].name, styleGuide, charsBeforeGen[i].description, worldSetting, projectRef.current.modelTier || 'STANDARD'); 
-                  let consistencyStatus: 'PASS' | 'FAIL' = 'PASS'; 
-                  let consistencyReport = ''; 
-                  try { 
-                      const check = await GeminiService.analyzeCharacterConsistency(result.imageUrl, projectRef.current.style, charsBeforeGen[i].name, projectRef.current.modelTier || 'STANDARD'); 
-                      consistencyStatus = check.isConsistent ? 'PASS' : 'FAIL'; 
-                      consistencyReport = check.critique; 
-                  } catch (e) {} 
-                  
-                  const charsAfterGen = [...projectRef.current.characters]; 
-                  charsAfterGen[i] = { 
-                      ...charsAfterGen[i], 
-                      description: result.description, 
-                      imageUrl: result.imageUrl, 
-                      isLocked: isLongFormat ? true : false, 
-                      isGenerating: false, 
-                      consistencyStatus, 
-                      consistencyReport, 
-                      variants: [...(charsAfterGen[i].variants || []), { id: crypto.randomUUID(), imageUrl: result.imageUrl, style: project.style, timestamp: Date.now() }] 
-                  }; 
-                  updateProject({ characters: charsAfterGen }); 
-                  if (consistencyStatus === 'FAIL') addLog(AgentRole.CHARACTER_DESIGNER, `Style inconsistency: ${charsAfterGen[i].name}`, 'warning'); 
-              } catch (error) { 
-                  const charsFailed = [...projectRef.current.characters]; 
-                  charsFailed[i] = { ...charsFailed[i], isGenerating: false }; 
-                  updateProject({ characters: charsFailed }); 
-              } 
-              await delay(2000); 
-          } 
-          addLog(AgentRole.CHARACTER_DESIGNER, "Character sheets ready.", 'success'); 
-      } catch (e) { 
-          addLog(AgentRole.PROJECT_MANAGER, "Visual production error.", 'error'); 
-      } finally { 
-          setLoading(false); 
-      } 
   };
   
+  const handleGenerateAllCharacters = async (selectedStyle: string) => {
+      // 1. Validation
+      if (!project.characters || project.characters.length === 0) {
+          alert("No characters found. Please ensure the Cast has been generated in the Scriptwriter step.");
+          return;
+      }
+
+      setLoading(true);
+      // Immediately update style in project so it persists
+      updateProject({ style: selectedStyle });
+      const currentImageModel = project.imageModel || 'gemini-2.5-flash-image';
+      addLog(AgentRole.CHARACTER_DESIGNER, `Starting batch generation for ${project.characters.length} characters. Style: ${selectedStyle}. Engine: ${currentImageModel}`, 'info');
+
+      // 2. Optimistic UI Update: Mark all as generating immediately
+      const charsStart = project.characters.map(c => {
+          // If locked and has image, skip
+          if (c.isLocked && c.imageUrl) return c;
+          // Otherwise mark as generating and clear previous error
+          return { ...c, isGenerating: true, error: undefined };
+      });
+      
+      // We must spread to trigger re-render
+      updateProject({ characters: [...charsStart] });
+
+      // Small delay to let UI render the spinners
+      await delay(100);
+
+      try {
+          // 3. API Key Check
+          await checkApiKeyRequirement();
+
+          // 4. Generate Style Guide (Force regeneration if style changed to ensure distinction)
+          addLog(AgentRole.CHARACTER_DESIGNER, "Generating Art Style Guide...", 'info');
+          const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || ""; 
+          let styleGuide = project.artStyleGuide;
+          
+          try {
+             // ALWAYS regenerate style guide if style is different or missing to solve the "same style" issue
+             if (!styleGuide || !styleGuide.includes(selectedStyle)) {
+                 styleGuide = await GeminiService.generateArtStyleGuide(selectedStyle, worldSetting, project.masterLanguage, project.modelTier);
+                 updateProject({ artStyleGuide: styleGuide });
+                 addLog(AgentRole.CHARACTER_DESIGNER, "New Style Guide enforced.", 'success');
+             }
+          } catch (err) {
+             console.warn("Style guide generation failed, falling back to raw style name.");
+             styleGuide = `Style: ${selectedStyle}. Setting: ${worldSetting}`;
+          }
+
+          // 5. Loop Characters
+          // Reference charsStart as base.
+          const workingChars = [...charsStart];
+
+          for (let i = 0; i < workingChars.length; i++) {
+              // Skip if locked (already checked in map, but good to be safe)
+              if (workingChars[i].isLocked && workingChars[i].imageUrl) continue;
+
+              addLog(AgentRole.CHARACTER_DESIGNER, `Generating ${workingChars[i].name}...`, 'info');
+              
+              try {
+                  const result = await GeminiService.generateCharacterDesign(
+                      workingChars[i].name, 
+                      styleGuide!, 
+                      workingChars[i].description, 
+                      worldSetting, 
+                      project.modelTier || 'STANDARD',
+                      currentImageModel // PASS MODEL HERE
+                  );
+
+                  // Success update
+                  workingChars[i] = {
+                      ...workingChars[i],
+                      imageUrl: result.imageUrl,
+                      description: result.description,
+                      isGenerating: false,
+                      error: undefined,
+                      variants: [...(workingChars[i].variants || []), { 
+                          id: crypto.randomUUID(), 
+                          imageUrl: result.imageUrl, 
+                          style: selectedStyle, 
+                          timestamp: Date.now() 
+                      }]
+                  };
+              } catch (e: any) {
+                  // Failure update
+                  workingChars[i] = { ...workingChars[i], isGenerating: false, error: e.message };
+                  addLog(AgentRole.CHARACTER_DESIGNER, `Failed: ${workingChars[i].name}. ${e.message}`, 'error');
+              }
+
+              // Update Project State for progressive feedback
+              updateProject({ characters: [...workingChars] });
+              
+              // Delay to prevent rate limits
+              await delay(1500); 
+          }
+          addLog(AgentRole.CHARACTER_DESIGNER, "Batch generation complete.", 'success');
+
+      } catch (e: any) {
+          addLog(AgentRole.CHARACTER_DESIGNER, `Process error: ${e.message}`, 'error');
+          // Reset generating state on crash
+          const charsReset = project.characters.map(c => ({ ...c, isGenerating: false }));
+          updateProject({ characters: charsReset });
+      } finally {
+          setLoading(false);
+      }
+  };
+
   const handleFinishCharacterDesign = async () => { 
       updateProject({ workflowStage: WorkflowStage.VISUALIZING_PANELS }); 
       addLog(AgentRole.CHARACTER_DESIGNER, "Character Designs finalized. Moving to Storyboard.", 'success');
@@ -482,17 +717,36 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
       setLoading(true);
       await checkApiKeyRequirement();
       try {
-          addLog(AgentRole.PANEL_ARTIST, `Drawing ${project.panels.length} panels in style: ${selectedStyle}...`, 'info');
+          const currentImageModel = project.imageModel || 'gemini-2.5-flash-image';
+          addLog(AgentRole.PANEL_ARTIST, `Drawing ${project.panels.length} panels in style: ${selectedStyle} (Engine: ${currentImageModel})...`, 'info');
           updateProject({ style: selectedStyle });
           
+          // Force regenerate style guide for panel artist too
+          const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || "";
+          let styleGuide = project.artStyleGuide;
+          if (!styleGuide || !styleGuide.includes(selectedStyle)) {
+             try {
+                 styleGuide = await GeminiService.generateArtStyleGuide(selectedStyle, worldSetting, project.masterLanguage, project.modelTier);
+                 updateProject({ artStyleGuide: styleGuide });
+             } catch (e) {
+                 styleGuide = `Style: ${selectedStyle}`;
+             }
+          }
+
           let updatedPanels = [...project.panels];
           for (let i = 0; i < updatedPanels.length; i++) {
               if (!updatedPanels[i].imageUrl) {
                   updatedPanels[i] = { ...updatedPanels[i], isGenerating: true };
                   updateProject({ panels: [...updatedPanels] });
                   try {
-                      const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || "";
-                      const imageUrl = await GeminiService.generatePanelImage(updatedPanels[i], `Style: ${selectedStyle}`, project.characters, worldSetting, project.modelTier || 'STANDARD');
+                      const imageUrl = await GeminiService.generatePanelImage(
+                          updatedPanels[i], 
+                          styleGuide!, 
+                          project.characters, 
+                          worldSetting, 
+                          project.modelTier || 'STANDARD',
+                          currentImageModel // PASS MODEL HERE
+                        );
                       updatedPanels[i] = { ...updatedPanels[i], imageUrl, isGenerating: false };
                   } catch (error) {
                       updatedPanels[i] = { ...updatedPanels[i], isGenerating: false };
@@ -516,15 +770,141 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
       onAgentChange(AgentRole.CINEMATOGRAPHER); 
   };
   
-  const handleRegenerateSinglePanel = async (panel: ComicPanel, index: number) => { await checkApiKeyRequirement(); const panelsBefore = [...project.panels]; panelsBefore[index] = { ...panelsBefore[index], isGenerating: true }; updateProject({ panels: panelsBefore }); setRegeneratingPanelId(panel.id); try { const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || ""; const styleGuide = project.artStyleGuide || `Style: ${project.style}`; const imageUrl = await GeminiService.generatePanelImage(panel, styleGuide, project.characters, worldSetting, project.modelTier || 'STANDARD'); const newPanels = [...project.panels]; newPanels[index] = { ...newPanels[index], imageUrl, isGenerating: false }; updateProject({ panels: newPanels }); } catch (e) { const newPanels = [...project.panels]; newPanels[index] = { ...newPanels[index], isGenerating: false }; updateProject({ panels: newPanels }); } finally { setRegeneratingPanelId(null); } };
-  const handleRegenerateSingleCharacter = async (char: Character, index: number, specificStyle?: string) => { await checkApiKeyRequirement(); const newChars = [...project.characters]; newChars[index] = { ...newChars[index], isGenerating: true }; updateProject({ characters: newChars }); const styleToUse = specificStyle || project.style; try { const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || ""; const styleGuide = specificStyle ? `Style: ${specificStyle}` : (project.artStyleGuide || `Style: ${project.style}`); const result = await GeminiService.generateCharacterDesign(char.name, styleGuide, char.description, worldSetting, project.modelTier || 'STANDARD'); const consistency = await GeminiService.analyzeCharacterConsistency(result.imageUrl, styleToUse, char.name, project.modelTier || 'STANDARD'); const newVariant: CharacterVariant = { id: crypto.randomUUID(), imageUrl: result.imageUrl, style: styleToUse, timestamp: Date.now() }; const updatedVariants = [...(newChars[index].variants || []), newVariant]; newChars[index] = { ...newChars[index], imageUrl: result.imageUrl, variants: updatedVariants, description: result.description, isGenerating: false, consistencyStatus: consistency.isConsistent ? 'PASS' : 'FAIL', consistencyReport: consistency.critique }; } catch (e) { newChars[index] = { ...newChars[index], isGenerating: false }; } updateProject({ characters: newChars }); };
+  const handleRegenerateSinglePanel = async (panel: ComicPanel, index: number) => { 
+      await checkApiKeyRequirement(); 
+      const panelsBefore = [...project.panels]; 
+      panelsBefore[index] = { ...panelsBefore[index], isGenerating: true }; 
+      updateProject({ panels: panelsBefore }); 
+      setRegeneratingPanelId(panel.id); 
+      try { 
+          const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || ""; 
+          const styleGuide = project.artStyleGuide || `Style: ${project.style}`; 
+          const currentImageModel = project.imageModel || 'gemini-2.5-flash-image';
+          
+          const imageUrl = await GeminiService.generatePanelImage(
+              panel, 
+              styleGuide, 
+              project.characters, 
+              worldSetting, 
+              project.modelTier || 'STANDARD',
+              currentImageModel // PASS MODEL HERE
+            ); 
+          const newPanels = [...project.panels]; 
+          newPanels[index] = { ...newPanels[index], imageUrl, isGenerating: false }; 
+          updateProject({ panels: newPanels }); 
+      } catch (e) { 
+          const newPanels = [...project.panels]; 
+          newPanels[index] = { ...newPanels[index], isGenerating: false }; 
+          updateProject({ panels: newPanels }); 
+      } finally { 
+          setRegeneratingPanelId(null); 
+      } 
+  };
+  
+  const handleRegenerateSingleCharacter = async (char: Character, index: number, specificStyle?: string) => { 
+      await checkApiKeyRequirement(); 
+      const charsStart = [...project.characters]; 
+      charsStart[index] = { ...charsStart[index], isGenerating: true, error: undefined }; // Clear error
+      updateProject({ characters: charsStart }); 
+      
+      const styleToUse = specificStyle || project.style; 
+      const currentImageModel = project.imageModel || 'gemini-2.5-flash-image';
+      
+      try { 
+          const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || ""; 
+          // Use existing guide unless specific style requested is different
+          let styleGuide = project.artStyleGuide;
+          if (specificStyle && (!styleGuide || !styleGuide.includes(specificStyle))) {
+               styleGuide = `Style: ${specificStyle}. Setting: ${worldSetting}`; // Fallback quick prompt if regenerating single with different style
+          } else if (!styleGuide) {
+               styleGuide = `Style: ${styleToUse}`;
+          }
+          
+          const result = await GeminiService.generateCharacterDesign(
+              char.name, 
+              styleGuide, 
+              char.description, 
+              worldSetting, 
+              project.modelTier || 'STANDARD',
+              currentImageModel // PASS MODEL HERE
+            ); 
+          
+          let consistencyStatus: 'PASS' | 'FAIL' = 'PASS'; 
+          let consistencyReport = ''; 
+          try { 
+              const check = await GeminiService.analyzeCharacterConsistency(result.imageUrl, styleToUse, char.name, project.modelTier || 'STANDARD'); 
+              consistencyStatus = check.isConsistent ? 'PASS' : 'FAIL'; 
+              consistencyReport = check.critique; 
+          } catch (e) {}
+
+          const newVariant: CharacterVariant = { id: crypto.randomUUID(), imageUrl: result.imageUrl, style: styleToUse, timestamp: Date.now() }; 
+          
+          const charsDone = [...projectRef.current.characters]; // Get latest
+          charsDone[index] = { 
+              ...charsDone[index], 
+              imageUrl: result.imageUrl, 
+              variants: [...(charsDone[index].variants || []), newVariant], 
+              description: result.description, 
+              isGenerating: false, 
+              error: undefined,
+              consistencyStatus, 
+              consistencyReport 
+          }; 
+          updateProject({ characters: charsDone });
+          
+      } catch (e: any) { 
+          const charsFail = [...project.characters]; 
+          charsFail[index] = { ...charsFail[index], isGenerating: false, error: e.message }; 
+          updateProject({ characters: charsFail }); 
+          addLog(AgentRole.CHARACTER_DESIGNER, `Failed to regenerate ${char.name}: ${e.message}`, 'error');
+      } 
+  };
+
   const handleSelectCharacterVariant = (charIndex: number, variant: CharacterVariant) => { const newChars = [...project.characters]; newChars[charIndex] = { ...newChars[charIndex], imageUrl: variant.imageUrl }; updateProject({ characters: newChars }); };
   const handleUpdateCharacterDescription = (index: number, value: string) => { const newChars = [...project.characters]; newChars[index] = { ...newChars[index], description: value }; updateProject({ characters: newChars }); };
   const handleUpdateCharacterVoice = (index: number, voice: string) => { const newChars = [...project.characters]; newChars[index] = { ...newChars[index], voice }; updateProject({ characters: newChars }); };
   const toggleCharacterLock = (charId: string) => { const newChars = project.characters.map(c => { if (c.id === charId) return { ...c, isLocked: !c.isLocked }; return c; }); updateProject({ characters: newChars }); };
   const handleCharacterUpload = async (e: React.ChangeEvent<HTMLInputElement>, charIndex: number) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const newChars = [...project.characters]; newChars[charIndex] = { ...newChars[charIndex], imageUrl: base64, isGenerating: false, isLocked: true }; updateProject({ characters: newChars }); }; reader.readAsDataURL(file); };
   const handleCheckConsistency = async (char: Character, index: number) => { if (!char.imageUrl) return; await checkApiKeyRequirement(); const newChars = [...project.characters]; newChars[index] = { ...newChars[index], isGenerating: true }; updateProject({ characters: newChars }); try { const result = await GeminiService.analyzeCharacterConsistency(char.imageUrl, project.style, char.name, project.modelTier || 'STANDARD'); newChars[index] = { ...newChars[index], isGenerating: false, consistencyStatus: result.isConsistent ? 'PASS' : 'FAIL', consistencyReport: result.critique }; addLog(AgentRole.CHARACTER_DESIGNER, `Consistency check for ${char.name}: ${result.isConsistent ? 'PASS' : 'FAIL'}`, result.isConsistent ? 'success' : 'warning'); } catch (e: any) { newChars[index] = { ...newChars[index], isGenerating: false }; addLog(AgentRole.CHARACTER_DESIGNER, `Check failed: ${e.message}`, 'error'); } updateProject({ characters: newChars }); };
-  const handleCompleteChapterAndNext = async () => { if(!confirm("Archive current panels and start next chapter?")) return; setLoading(true); try { const summary = await GeminiService.summarizeChapter(project.panels, project.modelTier || 'STANDARD'); const chapterData: ChapterArchive = { chapterNumber: project.currentChapter || 1, title: `Chapter ${project.currentChapter || 1}`, panels: [...project.panels], summary: summary, timestamp: Date.now() }; const nextChapter = (project.currentChapter || 1) + 1; let newTasks = project.agentTasks || []; newTasks = newTasks.map(t => { if (t.targetChapter === project.currentChapter && t.type === 'SYSTEM') return { ...t, isCompleted: true }; return t; }); const updatedProject: Partial<ComicProject> = { completedChapters: [...(project.completedChapters || []), chapterData], panels: [], currentChapter: nextChapter, workflowStage: WorkflowStage.SCRIPTING, agentTasks: newTasks }; updateProject(updatedProject); addLog(AgentRole.PROJECT_MANAGER, `Chapter ${chapterData.chapterNumber} Finished. Proceeding to Chapter ${nextChapter}.`, 'success'); StorageService.saveWorkInProgress({ ...project, ...updatedProject } as ComicProject); } catch(e) { addLog(AgentRole.PROJECT_MANAGER, "Failed to archive chapter.", 'error'); } finally { setLoading(false); } };
+  
+  const handleCompleteChapterAndNext = async () => { 
+      if(!confirm("Archive current panels and start next chapter?")) return; 
+      setLoading(true); 
+      try { 
+          const summary = await GeminiService.summarizeChapter(project.panels, project.modelTier || 'STANDARD'); 
+          const chapterData: ChapterArchive = { chapterNumber: project.currentChapter || 1, title: `Chapter ${project.currentChapter || 1}`, panels: [...project.panels], summary: summary, timestamp: Date.now() }; 
+          const nextChapter = (project.currentChapter || 1) + 1; 
+          
+          let newTasks = project.agentTasks || []; 
+          // Complete tasks for current chapter
+          newTasks = newTasks.map(t => { 
+              if (t.targetChapter === project.currentChapter && t.type === 'SYSTEM') return { ...t, isCompleted: true }; 
+              return t; 
+          }); 
+          
+          // Trigger breakdown for next chapter if needed
+          if (isLongFormat) {
+              handleBreakdownChapterTasks(nextChapter, project);
+          }
+
+          const updatedProject: Partial<ComicProject> = { 
+              completedChapters: [...(project.completedChapters || []), chapterData], 
+              panels: [], 
+              currentChapter: nextChapter, 
+              workflowStage: WorkflowStage.SCRIPTING, 
+              agentTasks: newTasks 
+          }; 
+          
+          updateProject(updatedProject); 
+          addLog(AgentRole.PROJECT_MANAGER, `Chapter ${chapterData.chapterNumber} Finished. Proceeding to Chapter ${nextChapter}.`, 'success'); 
+          StorageService.saveWorkInProgress({ ...project, ...updatedProject } as ComicProject); 
+      } catch(e) { 
+          addLog(AgentRole.PROJECT_MANAGER, "Failed to archive chapter.", 'error'); 
+      } finally { 
+          setLoading(false); 
+      } 
+  };
+
   const handleFinalizeProduction = async () => { if (isLongFormat) { await handleCompleteChapterAndNext(); } else { setLoading(true); try { const newPanels = [...project.panels]; for (let i = 0; i < newPanels.length; i++) { if (newPanels[i].dialogue && !newPanels[i].audioUrl) { try { const speakerName = newPanels[i].charactersInvolved[0]; const speaker = project.characters.find(c => c.name === speakerName); const audioUrl = await GeminiService.generateVoiceover(newPanels[i].dialogue, speaker?.voice || 'Puck'); newPanels[i].audioUrl = audioUrl; } catch (err) {} } } updateProject({ panels: [...newPanels], workflowStage: WorkflowStage.COMPLETED }); onAgentChange(AgentRole.PUBLISHER); } finally { setLoading(false); } } };
   const handleVerifyVoice = async (char: Character) => { setAnalyzingVoiceId(char.id); try { const result = await GeminiService.verifyCharacterVoice(char, char.voice || 'Puck'); setVoiceAnalysis(prev => ({ ...prev, [char.id]: result })); addLog(AgentRole.VOICE_ACTOR, `Analyzed voice for ${char.name}: ${result.isSuitable ? "Suitable" : "Mismatch"}`, result.isSuitable ? 'success' : 'warning'); } catch (e) { console.error(e); addLog(AgentRole.VOICE_ACTOR, "Voice analysis failed", 'error'); } finally { setAnalyzingVoiceId(null); } };
   const applyVoiceSuggestion = (charIndex: number, suggestedVoice: string) => { handleUpdateCharacterVoice(charIndex, suggestedVoice); setVoiceAnalysis(prev => { const newState = {...prev}; delete newState[project.characters[charIndex].id]; return newState; }); };
@@ -587,6 +967,61 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
       } 
   };
 
+  // --- NEW: HANDLE JUMP TO CHAPTER ---
+  const handleJumpToChapter = (chapterNum: number) => {
+      const isCurrentActive = project.currentChapter === chapterNum;
+      
+      // If we are already here, just switch to writer
+      if (isCurrentActive) {
+          onAgentChange(AgentRole.SCRIPTWRITER);
+          return;
+      }
+
+      // Check if current work exists and is unsaved/unarchived
+      if (project.panels.length > 0) {
+          const confirmSwitch = confirm(`Switching to Chapter ${chapterNum} will archive current Chapter ${project.currentChapter}. Continue?`);
+          if (!confirmSwitch) return;
+          
+          // Archive current
+          const chapterData: ChapterArchive = { 
+              chapterNumber: project.currentChapter || 1, 
+              title: `Chapter ${project.currentChapter || 1}`, 
+              panels: [...project.panels], 
+              summary: "Auto-archived on switch", 
+              timestamp: Date.now() 
+          };
+          
+          // Remove old archive of same chapter if exists
+          const cleanArchives = (project.completedChapters || []).filter(c => c.chapterNumber !== chapterData.chapterNumber);
+          
+          // Load new data logic
+          const targetArchived = project.completedChapters?.find(c => c.chapterNumber === chapterNum);
+          
+          updateProject({
+              completedChapters: [...cleanArchives, chapterData],
+              currentChapter: chapterNum,
+              panels: targetArchived ? targetArchived.panels : [], // Load or empty
+              workflowStage: WorkflowStage.SCRIPTING // Reset to scripting for editing
+          });
+      } else {
+          // No current work, safe switch
+          const targetArchived = project.completedChapters?.find(c => c.chapterNumber === chapterNum);
+          updateProject({
+              currentChapter: chapterNum,
+              panels: targetArchived ? targetArchived.panels : [],
+              workflowStage: WorkflowStage.SCRIPTING
+          });
+      }
+      
+      // Ensure tasks generated for this chapter
+      if (isLongFormat) {
+          handleBreakdownChapterTasks(chapterNum, project);
+      }
+
+      addLog(AgentRole.PROJECT_MANAGER, `Switched workspace to Chapter ${chapterNum}`, 'info');
+      onAgentChange(AgentRole.SCRIPTWRITER);
+  };
+
   if (role === AgentRole.PROJECT_MANAGER) {
       return (
         <AgentViewWrapper progressBar={renderProgressBar()} todoList={showTodoList && <AgentTodoList role={role} project={project} updateProject={updateProject} t={t} onClose={() => setShowTodoList(false)} />}>
@@ -611,6 +1046,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
                             handleFinalizeProduction={handleFinalizeProduction} handleImportManuscript={handleImportManuscript} 
                             handleExportProjectZip={handleExportProjectZip} handleImportProjectZip={handleImportProjectZip} 
                             handleRevertStage={handleRevertStage}
+                            handleJumpToChapter={handleJumpToChapter}
                             handleAddLanguage={handleAddLanguage} 
                             setInputText={setInputText} inputText={inputText} 
                             loading={loading} t={t} isLongFormat={isLongFormat} supportedLanguages={SUPPORTED_LANGUAGES}
@@ -629,7 +1065,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   if (role === AgentRole.SCRIPTWRITER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><WriterView project={project} handleImportScript={handleImportScript} handleExportScript={handleExportScript} handleApproveResearchAndScript={handleApproveResearchAndScript} updateProject={updateProject} loading={loading} t={t} scriptStep={scriptStep} writerLogsEndRef={writerLogsEndRef} role={role} isLongFormat={isLongFormat}/></AgentViewWrapper>;
   if (role === AgentRole.VOICE_ACTOR) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><VoiceView project={project} handleUpdateCharacterVoice={handleUpdateCharacterVoice} handleVerifyVoice={handleVerifyVoice} applyVoiceSuggestion={applyVoiceSuggestion} voiceAnalysis={voiceAnalysis} analyzingVoiceId={analyzingVoiceId} role={role} t={t} availableVoices={AVAILABLE_VOICES}/></AgentViewWrapper>;
   if (role === AgentRole.ARCHIVIST) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><div className="max-w-7xl mx-auto w-full px-8 pb-8"><div className="flex items-center justify-between mb-8"><div className="flex items-center gap-6"><img src={AGENTS[role].avatar} className="w-16 h-16 rounded-full border-2 border-gray-200 dark:border-gray-600 shadow-md" /><div><h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('role.archivist')}</h2><p className="text-gray-500 dark:text-gray-400">Secure textual storage.</p></div></div></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{library.map((p) => (<div key={p.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 hover:border-gray-300 dark:hover:border-gray-600 transition-all group flex flex-col h-64 relative shadow-sm hover:shadow-md"><h3 className="font-bold text-lg text-gray-800 dark:text-gray-100 mb-1 line-clamp-1">{p.title}</h3><div className="flex gap-2 mt-auto"><button onClick={() => handleLoadProject(p)} className="flex-1 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"><Briefcase className="w-4 h-4"/> {t('ui.upload')}</button><button onClick={() => handleDeleteFromLibrary(p.id!)} className="px-3 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 rounded-lg transition-colors border border-red-200 dark:border-red-900"><RefreshCw className="w-4 h-4"/></button></div></div>))}</div></div></AgentViewWrapper>;
-  if (role === AgentRole.CHARACTER_DESIGNER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><CharacterDesignerView project={project} handleFinishCharacterDesign={handleFinishCharacterDesign} handleRegenerateSingleCharacter={handleRegenerateSingleCharacter} handleUpdateCharacterDescription={handleUpdateCharacterDescription} handleUpdateCharacterVoice={handleUpdateCharacterVoice} toggleCharacterLock={toggleCharacterLock} handleCharacterUpload={handleCharacterUpload} handleCheckConsistency={handleCheckConsistency} handleSelectCharacterVariant={handleSelectCharacterVariant} role={role} t={t} availableVoices={AVAILABLE_VOICES}/></AgentViewWrapper>;
+  if (role === AgentRole.CHARACTER_DESIGNER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><CharacterDesignerView project={project} handleFinishCharacterDesign={handleFinishCharacterDesign} handleRegenerateSingleCharacter={handleRegenerateSingleCharacter} handleGenerateAllCharacters={handleGenerateAllCharacters} handleUpdateCharacterDescription={handleUpdateCharacterDescription} handleUpdateCharacterVoice={handleUpdateCharacterVoice} toggleCharacterLock={toggleCharacterLock} handleCharacterUpload={handleCharacterUpload} handleCheckConsistency={handleCheckConsistency} handleSelectCharacterVariant={handleSelectCharacterVariant} role={role} t={t} availableVoices={AVAILABLE_VOICES} loading={loading} /></AgentViewWrapper>;
   if (role === AgentRole.TYPESETTER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><TypesetterView project={project} handleFinishPrinting={handleFinishPrinting} role={role} t={t} /></AgentViewWrapper>;
   if (role === AgentRole.CINEMATOGRAPHER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><MotionView project={project} handleGeneratePanelVideo={handleGeneratePanelVideo} loading={loading} role={role} t={t}/></AgentViewWrapper>;
   

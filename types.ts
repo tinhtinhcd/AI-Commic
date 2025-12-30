@@ -65,6 +65,7 @@ export interface Character {
   personality?: string;
   consistencyStatus?: 'PENDING' | 'PASS' | 'FAIL';
   consistencyReport?: string;
+  error?: string;
 }
 
 export interface BookPage {
@@ -114,6 +115,7 @@ export interface ResearchData {
   worldSetting: string; // Dynamic cultural setting
   culturalContext?: string; // Additional context notes
   chapterOutlines?: { chapterNumber: number; summary: string }[];
+  extractedCharacters?: { name: string; role: string; description: string; personality: string }[]; // NEW FIELD
   colorPalette: string[];
   keyThemes: string[];
 }
@@ -151,6 +153,7 @@ export interface ComicProject {
   storyFormat: StoryFormat;
   publicationType: PublicationType;
   modelTier?: 'STANDARD' | 'PREMIUM';
+  imageModel?: 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview'; // NEW FIELD
   originalScript?: string;
   masterLanguage: string;
   targetLanguages: string[];
@@ -171,7 +174,7 @@ export interface ComicProject {
   continuityReport?: string;
   isCensored: boolean;
   style: string;
-  artStyleGuide?: string; // NEW: The AI's research on the chosen style
+  artStyleGuide?: string; 
   language: string;
   coverImage?: string;
   characters: Character[];

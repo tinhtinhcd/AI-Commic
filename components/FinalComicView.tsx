@@ -8,7 +8,8 @@ interface FinalComicViewProps {
 }
 
 const FinalComicView: React.FC<FinalComicViewProps> = ({ project }) => {
-  if (project.panels.length === 0) return null;
+  const panels = project.panels || [];
+  if (panels.length === 0) return null;
 
   const playAudio = (url: string) => {
       new Audio(url).play();
@@ -60,7 +61,7 @@ const FinalComicView: React.FC<FinalComicViewProps> = ({ project }) => {
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 dark:bg-gray-900 px-2 inline-block -mb-6 relative z-10">Story Content</p>
             </div>
 
-            {project.panels.map((panel, idx) => (
+            {panels.map((panel, idx) => (
                 <div key={panel.id} className="bg-white dark:bg-gray-800 p-2 shadow-sm border border-gray-200 dark:border-gray-700 rounded-sm mb-6">
                     <div className="border border-gray-900 bg-gray-100 dark:bg-gray-900 aspect-[4/3] overflow-hidden relative group">
                          {/* Narrator */}

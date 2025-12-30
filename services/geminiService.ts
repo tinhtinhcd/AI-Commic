@@ -8,9 +8,6 @@ const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 const getTextModel = (tier: 'STANDARD' | 'PREMIUM' = 'STANDARD') => 
     tier === 'PREMIUM' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 
-const getImageModel = (tier: 'STANDARD' | 'PREMIUM' = 'STANDARD') => 
-    'gemini-2.5-flash-image'; 
-
 const cleanAndParseJSON = (text: string) => {
     try {
         let cleanText = text.trim();
@@ -63,7 +60,6 @@ export const extractStrategyFromChat = async (history: Message[], language: stri
     return cleanAndParseJSON(response.text!);
 };
 
-// NEW: Research the Art Style based on Name & Culture
 export const generateArtStyleGuide = async (styleName: string, culturalSetting: string, language: string, tier: 'STANDARD' | 'PREMIUM' = 'STANDARD'): Promise<string> => {
     const ai = getAI();
     const response = await ai.models.generateContent({
@@ -83,11 +79,27 @@ export const generateStoryConceptsWithSearch = async (theme: string, style: stri
     return cleanAndParseJSON(response.text!);
 };
 
-export const generateComplexCharacters = async (concept: StoryConcept, language: string, setting: string, tier: 'STANDARD' | 'PREMIUM'): Promise<Character[]> => {
+export const generateComplexCharacters = async (
+    concept: StoryConcept, 
+    language: string, 
+    setting: string, 
+    tier: 'STANDARD' | 'PREMIUM',
+    sourceText?: string
+): Promise<Character[]> => {
     const ai = getAI();
+    let contents = "";
+
+    // IMPORTANT: If source text (manuscript) is provided, use extraction prompt.
+    // Otherwise, use generation prompt based on concept.
+    if (sourceText && sourceText.length > 100) {
+        contents = PROMPTS.extractCharactersFromText(sourceText, language);
+    } else {
+        contents = PROMPTS.complexCharacters(concept.premise, language, setting);
+    }
+
     const response = await ai.models.generateContent({
         model: getTextModel(tier),
-        contents: PROMPTS.complexCharacters(concept.premise, language, setting),
+        contents: contents,
         config: { responseMimeType: "application/json" }
     });
     const chars = cleanAndParseJSON(response.text!);
@@ -145,7 +157,14 @@ export const generateScript = async (
     };
 };
 
-export const generateCharacterDesign = async (name: string, styleGuide: string, description: string, worldSetting: string, tier: 'STANDARD' | 'PREMIUM'): Promise<{ description: string, imageUrl: string }> => {
+export const generateCharacterDesign = async (
+    name: string, 
+    styleGuide: string, 
+    description: string, 
+    worldSetting: string, 
+    tier: 'STANDARD' | 'PREMIUM',
+    imageModel: string = 'gemini-2.5-flash-image'
+): Promise<{ description: string, imageUrl: string }> => {
     const ai = getAI();
     
     // 1. Refine Description
@@ -155,10 +174,21 @@ export const generateCharacterDesign = async (name: string, styleGuide: string, 
     });
     const refinedDesc = descResp.text!;
 
-    // 2. Generate Image
+    // 2. Generate Image with specific config based on model
+    let imageConfig = {};
+    if (imageModel === 'gemini-3-pro-image-preview') {
+        imageConfig = {
+            imageConfig: {
+                aspectRatio: "1:1",
+                imageSize: "1K"
+            }
+        };
+    }
+
     const response = await ai.models.generateContent({
-        model: getImageModel(tier),
+        model: imageModel,
         contents: PROMPTS.characterImagePrompt(name, refinedDesc, styleGuide),
+        config: imageConfig
     });
 
     let imageUrl = '';
@@ -172,14 +202,32 @@ export const generateCharacterDesign = async (name: string, styleGuide: string, 
     return { description: refinedDesc, imageUrl };
 };
 
-export const generatePanelImage = async (panel: ComicPanel, styleGuide: string, characters: Character[], worldSetting: string, tier: 'STANDARD' | 'PREMIUM'): Promise<string> => {
+export const generatePanelImage = async (
+    panel: ComicPanel, 
+    styleGuide: string, 
+    characters: Character[], 
+    worldSetting: string, 
+    tier: 'STANDARD' | 'PREMIUM',
+    imageModel: string = 'gemini-2.5-flash-image'
+): Promise<string> => {
     const ai = getAI();
     const charDesc = characters.filter(c => panel.charactersInvolved.includes(c.name))
         .map(c => `${c.name}: ${c.description}`).join(". ");
     
+    let imageConfig = {};
+    if (imageModel === 'gemini-3-pro-image-preview') {
+        imageConfig = {
+            imageConfig: {
+                aspectRatio: "16:9",
+                imageSize: "1K"
+            }
+        };
+    }
+
     const response = await ai.models.generateContent({
-        model: getImageModel(tier),
+        model: imageModel,
         contents: PROMPTS.panelImagePrompt(styleGuide, panel.description, charDesc, worldSetting),
+        config: imageConfig
     });
 
     let imageUrl = '';
