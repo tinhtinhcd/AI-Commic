@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { AgentRole, ComicProject, Character, ComicPanel } from '../types';
 import { AGENTS } from '../constants';
-import { Printer, Users, Loader2, ScanFace, CheckCircle, AlertTriangle, Play, Film, FileText, ShieldAlert, Activity, Globe, Plus, BookOpen, Mic, Clapperboard, Download } from 'lucide-react';
+import { Printer, Users, Loader2, ScanFace, CheckCircle, AlertTriangle, Play, Film, FileText, ShieldAlert, Activity, Globe, Plus, BookOpen, Mic, Clapperboard, Download, Megaphone, Share2, Sparkles } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import * as GeminiService from '../services/geminiService';
 
 // --- TYPESETTER VIEW ---
 export const TypesetterView: React.FC<{
@@ -108,7 +108,7 @@ export const VoiceView: React.FC<{
                                 <div className="relative">
                                     <select 
                                         value={char.voice || availableVoices[0]}
-                                        onChange={(e) => handleUpdateCharacterVoice(idx, e.target.value)}
+                                        onChange={(e) => handleUpdateCharacterVoice(idx, (e.target as HTMLSelectElement).value)}
                                         className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-2 pl-3 pr-8 text-sm font-medium text-gray-700 dark:text-gray-300 focus:border-pink-300 outline-none appearance-none"
                                     >
                                         {availableVoices.map(v => <option key={v} value={v}>{v}</option>)}
@@ -183,7 +183,7 @@ export const MotionView: React.FC<{
 
             const videoPanels = panels.filter(p => p.videoUrl);
             if (videoPanels.length === 0) {
-                alert("No generated videos to merge.");
+                window.alert("No generated videos to merge.");
                 return;
             }
 
@@ -203,16 +203,16 @@ export const MotionView: React.FC<{
             const url = URL.createObjectURL(new Blob([(data as any).buffer], { type: 'video/mp4' }));
 
             // Download
-            const a = document.createElement('a');
+            const a = window.document.createElement('a');
             a.href = url;
             a.download = `${project.title.replace(/\s+/g, '_')}_MotionComic.mp4`;
-            document.body.appendChild(a);
+            window.document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
+            window.document.body.removeChild(a);
             
         } catch (e: any) {
             console.error(e);
-            alert("Video compilation failed. NOTE: Your browser must support 'SharedArrayBuffer' (Desktop Chrome/Edge/Firefox). If on mobile, please download clips individually.");
+            window.alert("Video compilation failed. NOTE: Your browser must support 'SharedArrayBuffer' (Desktop Chrome/Edge/Firefox). If on mobile, please download clips individually.");
         } finally {
             setIsCompiling(false);
             setProgress(0);
@@ -383,6 +383,131 @@ export const CensorView: React.FC<{
     );
 };
 
+// --- NEW: PUBLISHER VIEW ---
+export const PublisherView: React.FC<{
+    project: ComicProject;
+    role: AgentRole;
+    t: (k: string) => string;
+}> = ({ project, role, t }) => {
+    const [marketingData, setMarketingData] = useState<{blurb: string, socialPost: string, tagline: string} | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const generateMarketing = async () => {
+        setLoading(true);
+        try {
+            const data = await GeminiService.generateMarketingCopy(project);
+            setMarketingData(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleExportJSON = () => {
+        const dataStr = JSON.stringify(project, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        const linkElement = window.document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', `${project.title.replace(/\s+/g, '_')}_Final.json`);
+        linkElement.click();
+    };
+
+    return (
+        <div className="max-w-7xl mx-auto w-full px-6 pb-24">
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-6">
+                    <img src={AGENTS[role].avatar} className="w-16 h-16 rounded-full border-2 border-amber-500 shadow-md" />
+                    <div>
+                        <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{t(AGENTS[role].name)}</h2>
+                        <p className="text-gray-500 dark:text-gray-400">Distribution & Marketing</p>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                     <button onClick={handleExportJSON} className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-gray-300 dark:shadow-none transition-all">
+                        <Download className="w-5 h-5"/> Export JSON
+                    </button>
+                    <button className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-amber-200 dark:shadow-none transition-all">
+                        <Megaphone className="w-5 h-5"/> Publish Online
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Project Status Card */}
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
+                    <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-amber-600"/> Publication Ready
+                    </h3>
+                    
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
+                             <div>
+                                 <p className="text-xs font-bold text-gray-500 uppercase">Format</p>
+                                 <p className="font-bold text-gray-800 dark:text-gray-200">{project.storyFormat}</p>
+                             </div>
+                             <CheckCircle className="w-6 h-6 text-emerald-500"/>
+                        </div>
+                         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
+                             <div>
+                                 <p className="text-xs font-bold text-gray-500 uppercase">Total Panels</p>
+                                 <p className="font-bold text-gray-800 dark:text-gray-200">{project.panels?.length || 0}</p>
+                             </div>
+                             <CheckCircle className="w-6 h-6 text-emerald-500"/>
+                        </div>
+                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
+                             <div>
+                                 <p className="text-xs font-bold text-gray-500 uppercase">Languages</p>
+                                 <p className="font-bold text-gray-800 dark:text-gray-200">{project.targetLanguages?.length || 1}</p>
+                             </div>
+                             <CheckCircle className="w-6 h-6 text-emerald-500"/>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Marketing Generator */}
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm flex flex-col">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-amber-600"/> Marketing Kit
+                        </h3>
+                        <button 
+                            onClick={generateMarketing} 
+                            disabled={loading}
+                            className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-lg border border-amber-100 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors flex items-center gap-1"
+                        >
+                            {loading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>}
+                            Generate with AI
+                        </button>
+                    </div>
+
+                    {marketingData ? (
+                        <div className="space-y-4 flex-1">
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tagline</p>
+                                <p className="text-lg font-black text-gray-800 dark:text-gray-100 italic">"{marketingData.tagline}"</p>
+                            </div>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Back Cover Blurb</p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{marketingData.blurb}</p>
+                            </div>
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+                                <p className="text-[10px] font-bold text-blue-400 uppercase mb-2 flex items-center gap-1"><Share2 className="w-3 h-3"/> Social Media Post</p>
+                                <p className="text-sm text-blue-900 dark:text-blue-200 leading-relaxed font-medium">{marketingData.socialPost}</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4 min-h-[200px]">
+                            <Megaphone className="w-12 h-12 opacity-20"/>
+                            <p className="text-sm">Generate catchy copy to promote your comic.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- TRANSLATOR VIEW ---
 export const TranslatorView: React.FC<{
     project: ComicProject;
@@ -392,9 +517,7 @@ export const TranslatorView: React.FC<{
     role: AgentRole;
     t: (k: string) => string;
 }> = ({ project, updateProject, handleAddLanguage, loading, role, t }) => {
-    const [newLangInput, setNewLangInput] = useState('');
-    const targetLanguages = project.targetLanguages || [];
-    const panels = project.panels || [];
+    const [newLangInput, setNewLangInput] = React.useState('');
 
     return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-24">
@@ -411,13 +534,13 @@ export const TranslatorView: React.FC<{
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                  <div className="lg:col-span-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm h-fit">
                      <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                         <Globe className="w-5 h-5 text-cyan-600"/> Languages
+                         <Globe className="w-5 h-5 text-cyan-600 dark:text-cyan-400"/> Languages
                      </h3>
                      <div className="space-y-3 mb-6">
-                         {targetLanguages.map(lang => (
-                             <div key={lang} className="flex items-center justify-between p-3 rounded-xl border bg-cyan-50 dark:bg-cyan-900/20 border-cyan-100 dark:border-cyan-800 text-cyan-800 dark:text-cyan-300">
+                         {project.targetLanguages.map(lang => (
+                             <div key={lang} className="flex items-center justify-between p-3 rounded-xl border bg-cyan-50 dark:bg-cyan-900/30 border-cyan-100 dark:border-cyan-800 text-cyan-800 dark:text-cyan-300">
                                  <span className="font-bold text-sm">{lang}</span>
-                                 {lang === project.masterLanguage && <span className="text-[10px] bg-white dark:bg-gray-800 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-700 font-bold uppercase text-cyan-600 dark:text-cyan-400">Master</span>}
+                                 {lang === project.masterLanguage && <span className="text-[10px] bg-white dark:bg-gray-700 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-700 font-bold uppercase text-cyan-600 dark:text-cyan-400">Master</span>}
                              </div>
                          ))}
                      </div>
@@ -429,7 +552,7 @@ export const TranslatorView: React.FC<{
                                 value={newLangInput}
                                 onChange={(e) => setNewLangInput(e.target.value)}
                                 placeholder="e.g. Spanish"
-                                className="flex-1 text-sm p-2 rounded-lg border border-gray-200 dark:border-gray-600 outline-none focus:border-cyan-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                className="flex-1 text-sm p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-cyan-400"
                              />
                              <button 
                                 onClick={() => { handleAddLanguage(newLangInput); setNewLangInput(''); }}
@@ -444,27 +567,27 @@ export const TranslatorView: React.FC<{
 
                  <div className="lg:col-span-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
                      <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                         <BookOpen className="w-5 h-5 text-cyan-600"/> Content Preview
+                         <BookOpen className="w-5 h-5 text-cyan-600 dark:text-cyan-400"/> Content Preview
                      </h3>
-                     {panels.length === 0 ? (
+                     {project.panels.length === 0 ? (
                          <div className="text-center text-gray-400 py-12 italic">No panels content to translate yet.</div>
                      ) : (
                          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                             {panels.map((panel, idx) => (
+                             {project.panels.map((panel, idx) => (
                                  <div key={panel.id} className="p-4 border border-gray-100 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                      <div className="flex items-center gap-2 mb-2">
-                                         <span className="bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] font-bold px-2 py-0.5 rounded-full">Panel #{idx+1}</span>
+                                         <span className="bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-[10px] font-bold px-2 py-0.5 rounded-full">Panel #{idx+1}</span>
                                          <span className="text-xs text-gray-400 font-mono truncate flex-1">{panel.description.substring(0, 50)}...</span>
                                      </div>
                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                          <div>
                                              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Original ({project.masterLanguage})</label>
-                                             <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">{panel.dialogue || <span className="text-gray-300 italic">No dialogue</span>}</p>
+                                             <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">{panel.dialogue || <span className="text-gray-300 dark:text-gray-600 italic">No dialogue</span>}</p>
                                          </div>
-                                         {targetLanguages.filter(l => l !== project.masterLanguage).map(lang => (
+                                         {project.targetLanguages.filter(l => l !== project.masterLanguage).map(lang => (
                                              <div key={lang}>
                                                  <label className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 uppercase block mb-1">{lang}</label>
-                                                 <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2 rounded border border-cyan-100 dark:border-cyan-900">{panel.translations?.[lang]?.dialogue || <span className="text-gray-300 italic">Pending...</span>}</p>
+                                                 <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2 rounded border border-cyan-100 dark:border-cyan-900/50">{panel.translations?.[lang]?.dialogue || <span className="text-gray-300 dark:text-gray-600 italic">Pending...</span>}</p>
                                              </div>
                                          ))}
                                      </div>

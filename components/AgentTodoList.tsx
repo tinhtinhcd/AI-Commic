@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AgentRole, ComicProject, AgentTask } from '../types';
 import { AGENTS } from '../constants';

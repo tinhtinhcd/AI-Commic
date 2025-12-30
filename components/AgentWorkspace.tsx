@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentRole, ComicProject, ComicPanel, Character, WorkflowStage, SystemLog, ResearchData, StoryFormat, StoryConcept, Message, ChapterArchive, AgentTask, CharacterVariant } from '../types';
 import { AGENTS, TRANSLATIONS, INITIAL_PROJECT_STATE } from '../constants';
@@ -7,7 +6,7 @@ import * as StorageService from '../services/storageService';
 import { Send, RefreshCw, CheckCircle, Loader2, Sparkles, UserPlus, BookOpen, Users, Megaphone, Video, Palette, Save, Globe, TrendingUp, ShieldAlert, Archive, Briefcase, ChevronRight, Printer, ListTodo, Lock, Layers, Split } from 'lucide-react';
 import { ManagerView } from './ManagerView';
 import { ResearchView, WriterView, CharacterDesignerView, PanelArtistView } from './CreativeViews';
-import { VoiceView, MotionView, TypesetterView, ContinuityView, CensorView, TranslatorView } from './ProductionViews';
+import { VoiceView, MotionView, TypesetterView, ContinuityView, CensorView, TranslatorView, PublisherView } from './ProductionViews';
 import AgentTodoList from './AgentTodoList';
 import { useProjectManagement } from '../hooks/useProjectManagement';
 
@@ -131,9 +130,9 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
 
   useEffect(() => { projectRef.current = project; }, [project]);
   useEffect(() => {
-    if (role === AgentRole.PROJECT_MANAGER) logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    if (role === AgentRole.SCRIPTWRITER && loading) writerLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    if (role === AgentRole.MARKET_RESEARCHER) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (role === AgentRole.PROJECT_MANAGER) (logsEndRef.current as any)?.scrollIntoView({ behavior: 'smooth' });
+    if (role === AgentRole.SCRIPTWRITER && loading) (writerLogsEndRef.current as any)?.scrollIntoView({ behavior: 'smooth' });
+    if (role === AgentRole.MARKET_RESEARCHER) (chatEndRef.current as any)?.scrollIntoView({ behavior: 'smooth' });
     if (role === AgentRole.SCRIPTWRITER && (project.panels || []).length > 0) setScriptStep('WRITING');
   }, [project.logs, role, project.panels, loading]);
 
@@ -211,7 +210,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
 
 
   const handleImportManuscript = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -555,7 +554,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           }
 
           if (textToAnalyze.length < 50) {
-               alert("Chưa có nội dung kịch bản để phân tích. (Script is empty)");
+               window.alert("Chưa có nội dung kịch bản để phân tích. (Script is empty)");
                setLoading(false);
                return;
           }
@@ -650,13 +649,13 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           throw e; 
       }
   };
-  const handleExportScript = () => { const dataStr = JSON.stringify(project.panels, null, 2); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', `${project.title || 'comic'}_ch${project.currentChapter || 1}_script.json`); linkElement.click(); };
-  const handleImportScript = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event) => { try { const importedPanels = JSON.parse(event.target?.result as string); if (Array.isArray(importedPanels)) { updateProject({ panels: importedPanels, workflowStage: WorkflowStage.CENSORING_SCRIPT }); addLog(AgentRole.SCRIPTWRITER, `Script imported.`, 'success'); } } catch (err) {} }; reader.readAsText(file); };
+  const handleExportScript = () => { const dataStr = JSON.stringify(project.panels, null, 2); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const linkElement = window.document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', `${project.title || 'comic'}_ch${project.currentChapter || 1}_script.json`); linkElement.click(); };
+  const handleImportScript = (e: React.ChangeEvent<HTMLInputElement>) => { const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event) => { try { const importedPanels = JSON.parse(event.target?.result as string); if (Array.isArray(importedPanels)) { updateProject({ panels: importedPanels, workflowStage: WorkflowStage.CENSORING_SCRIPT }); addLog(AgentRole.SCRIPTWRITER, `Script imported.`, 'success'); } } catch (err) {} }; reader.readAsText(file); };
   const handleApproveResearchAndScript = async () => { onAgentChange(AgentRole.SCRIPTWRITER); setLoading(true); try { await handleGenerateConcept(); await handleGenerateCast(); await handleGenerateFinalScript(); } catch (e) { console.error(e); } finally { setLoading(false); } };
   
   const handleApproveScriptAndVisualize = async () => { 
       // Replaced by auto-transition, but kept for manual trigger
-      if (project.isCensored) { alert("Script unsafe."); return; } 
+      if (project.isCensored) { window.alert("Script unsafe."); return; } 
       updateProject({ workflowStage: WorkflowStage.DESIGNING_CHARACTERS }); 
       addLog(AgentRole.PROJECT_MANAGER, `Manually advancing to Character Design.`, 'info'); 
       onAgentChange(AgentRole.CHARACTER_DESIGNER); 
@@ -665,7 +664,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   const handleGenerateAllCharacters = async (selectedStyle: string) => {
       // 1. Validation
       if (!project.characters || project.characters.length === 0) {
-          alert("No characters found. Please ensure the Cast has been generated in the Scriptwriter step.");
+          window.alert("No characters found. Please ensure the Cast has been generated in the Scriptwriter step.");
           return;
       }
 
@@ -925,11 +924,11 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   const handleUpdateCharacterDescription = (index: number, value: string) => { const newChars = [...project.characters]; newChars[index] = { ...newChars[index], description: value }; updateProject({ characters: newChars }); };
   const handleUpdateCharacterVoice = (index: number, voice: string) => { const newChars = [...project.characters]; newChars[index] = { ...newChars[index], voice }; updateProject({ characters: newChars }); };
   const toggleCharacterLock = (charId: string) => { const newChars = project.characters.map(c => { if (c.id === charId) return { ...c, isLocked: !c.isLocked }; return c; }); updateProject({ characters: newChars }); };
-  const handleCharacterUpload = async (e: React.ChangeEvent<HTMLInputElement>, charIndex: number) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const newChars = [...project.characters]; newChars[charIndex] = { ...newChars[charIndex], imageUrl: base64, isGenerating: false, isLocked: true }; updateProject({ characters: newChars }); }; reader.readAsDataURL(file); };
+  const handleCharacterUpload = async (e: React.ChangeEvent<HTMLInputElement>, charIndex: number) => { const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return; const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const newChars = [...project.characters]; newChars[charIndex] = { ...newChars[charIndex], imageUrl: base64, isGenerating: false, isLocked: true }; updateProject({ characters: newChars }); }; reader.readAsDataURL(file); };
   const handleCheckConsistency = async (char: Character, index: number) => { if (!char.imageUrl) return; await checkApiKeyRequirement(); const newChars = [...project.characters]; newChars[index] = { ...newChars[index], isGenerating: true }; updateProject({ characters: newChars }); try { const result = await GeminiService.analyzeCharacterConsistency(char.imageUrl, project.style, char.name, project.modelTier || 'STANDARD'); newChars[index] = { ...newChars[index], isGenerating: false, consistencyStatus: result.isConsistent ? 'PASS' : 'FAIL', consistencyReport: result.critique }; addLog(AgentRole.CHARACTER_DESIGNER, `Consistency check for ${char.name}: ${result.isConsistent ? 'PASS' : 'FAIL'}`, result.isConsistent ? 'success' : 'warning'); } catch (e: any) { newChars[index] = { ...newChars[index], isGenerating: false }; addLog(AgentRole.CHARACTER_DESIGNER, `Check failed: ${e.message}`, 'error'); } updateProject({ characters: newChars }); };
   
   const handleCompleteChapterAndNext = async () => { 
-      if(!confirm("Archive current panels and start next chapter?")) return; 
+      if(!window.confirm("Archive current panels and start next chapter?")) return; 
       setLoading(true); 
       try { 
           const summary = await GeminiService.summarizeChapter(project.panels, project.modelTier || 'STANDARD'); 
@@ -1015,7 +1014,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   
   // ROBUST REVERT STAGE
   const handleRevertStage = () => { 
-      if (!confirm("Are you sure you want to revert to the previous stage?")) return;
+      if (!window.confirm("Are you sure you want to revert to the previous stage?")) return;
       const currentIdx = getCurrentStageIndex(); 
       if (currentIdx > 0) { 
           const prevStage = WORKFLOW_ORDER[currentIdx - 1]; 
@@ -1040,7 +1039,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
 
       // Check if current work exists and is unsaved/unarchived
       if (project.panels.length > 0) {
-          const confirmSwitch = confirm(`Switching to Chapter ${chapterNum} will archive current Chapter ${project.currentChapter}. Continue?`);
+          const confirmSwitch = window.confirm(`Switching to Chapter ${chapterNum} will archive current Chapter ${project.currentChapter}. Continue?`);
           if (!confirmSwitch) return;
           
           // Archive current
@@ -1129,16 +1128,16 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   if (role === AgentRole.CHARACTER_DESIGNER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><CharacterDesignerView project={project} handleFinishCharacterDesign={handleFinishCharacterDesign} handleRegenerateSingleCharacter={handleRegenerateSingleCharacter} handleGenerateAllCharacters={handleGenerateAllCharacters} handleUpdateCharacterDescription={handleUpdateCharacterDescription} handleUpdateCharacterVoice={handleUpdateCharacterVoice} toggleCharacterLock={toggleCharacterLock} handleCharacterUpload={handleCharacterUpload} handleCheckConsistency={handleCheckConsistency} handleSelectCharacterVariant={handleSelectCharacterVariant} role={role} t={t} availableVoices={AVAILABLE_VOICES} loading={loading} /></AgentViewWrapper>;
   if (role === AgentRole.TYPESETTER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><TypesetterView project={project} handleFinishPrinting={handleFinishPrinting} role={role} t={t} /></AgentViewWrapper>;
   if (role === AgentRole.CINEMATOGRAPHER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><MotionView project={project} handleGeneratePanelVideo={handleGeneratePanelVideo} loading={loading} role={role} t={t}/></AgentViewWrapper>;
-  
   if (role === AgentRole.CONTINUITY_EDITOR) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><ContinuityView project={project} handleRunContinuityCheck={handleRunContinuityCheck} loading={loading} role={role} t={t} /></AgentViewWrapper>;
   if (role === AgentRole.CENSOR) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><CensorView project={project} handleRunCensorCheck={handleRunCensorCheck} loading={loading} role={role} t={t} /></AgentViewWrapper>;
   if (role === AgentRole.TRANSLATOR) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><TranslatorView project={project} updateProject={updateProject} handleAddLanguage={handleAddLanguage} loading={loading} role={role} t={t} /></AgentViewWrapper>;
-
-  // Use the new PanelArtistView
   if (role === AgentRole.PANEL_ARTIST) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><PanelArtistView project={project} handleStartPanelGeneration={handleStartPanelGeneration} handleRegenerateSinglePanel={handleRegenerateSinglePanel} handleFinishPanelArt={handleFinishPanelArt} loading={loading} role={role} t={t} /></AgentViewWrapper>;
 
-  // Fallback for Publisher
-  return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><div className="p-8 max-w-4xl mx-auto"><div className="flex items-center gap-6 mb-8"><img src={AGENTS[role].avatar} className="w-16 h-16 rounded-full border-2 border-gray-100 shadow-md" /><h2 className="text-3xl font-bold text-gray-900">{t(AGENTS[role].name)}</h2></div></div></AgentViewWrapper>;
+  // ADDED PUBLISHER VIEW
+  if (role === AgentRole.PUBLISHER) return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><PublisherView project={project} role={role} t={t} /></AgentViewWrapper>;
+
+  // Fallback
+  return <AgentViewWrapper progressBar={progressBar} todoList={commonTodoList}><div className="p-8 max-w-4xl mx-auto"><div className="flex items-center gap-6 mb-8"><img src={AGENTS[role as AgentRole].avatar} className="w-16 h-16 rounded-full border-2 border-gray-100 shadow-md" /><h2 className="text-3xl font-bold text-gray-900">{t(AGENTS[role as AgentRole].name)}</h2></div></div></AgentViewWrapper>;
 };
 
 export default AgentWorkspace;

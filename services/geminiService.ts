@@ -1,6 +1,7 @@
 
+
 import { GoogleGenAI } from "@google/genai";
-import { ComicPanel, Character, ResearchData, StoryFormat, StoryConcept, Message } from "../types";
+import { ComicPanel, Character, ResearchData, StoryFormat, StoryConcept, Message, ComicProject } from "../types";
 import { PROMPTS } from "./prompts";
 
 // The API key must be obtained exclusively from process.env.API_KEY.
@@ -358,4 +359,19 @@ export const checkContinuity = async (panels: ComicPanel[], characters: Characte
         contents: PROMPTS.continuityCheck(panelsText, charNames, setting)
     });
     return response.text!;
+};
+
+// NEW: Marketing Generator for Publisher
+export const generateMarketingCopy = async (project: ComicProject): Promise<{ blurb: string, socialPost: string, tagline: string }> => {
+    const ai = getAI();
+    // Gather context
+    const summary = project.completedChapters?.[0]?.summary || project.storyConcept?.premise || "An epic story.";
+    const audience = project.marketAnalysis?.targetAudience || "General Audience";
+    
+    const response = await ai.models.generateContent({
+        model: getTextModel(project.modelTier),
+        contents: PROMPTS.marketingCopy(project.title, summary, audience, project.activeLanguage),
+        config: { responseMimeType: "application/json" }
+    });
+    return cleanAndParseJSON(response.text!);
 };

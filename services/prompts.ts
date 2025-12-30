@@ -1,4 +1,5 @@
 
+
 export const PROMPTS = {
     // 1. Analyze Manuscript with Cultural Extraction
     analyzeManuscript: (scriptContent: string, language: string) => `
@@ -252,5 +253,23 @@ export const PROMPTS = {
         }
     `,
     
-    summarizeChapter: (text: string) => `Summarize in 3 sentences: ${text}`
+    summarizeChapter: (text: string) => `Summarize in 3 sentences: ${text}`,
+
+    // NEW: Publisher Agent Prompt
+    marketingCopy: (title: string, summary: string, audience: string, language: string) => `
+        Act as a Senior Marketing Manager for a Comic Publisher.
+        Create marketing materials for a new comic titled "${title}".
+        
+        Context:
+        - Summary: ${summary}
+        - Target Audience: ${audience}
+        - Language: ${language}
+        
+        Generate:
+        1. A catchy "Back Cover Blurb" (approx 50 words).
+        2. A viral Social Media Post (Instagram/Twitter style with hashtags).
+        3. A tagline.
+        
+        Return JSON: { blurb: string, socialPost: string, tagline: string }
+    `
 };

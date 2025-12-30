@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ComicProject } from '../types';
 import { Download, Play, Volume2, Book, MessageSquare, Loader2 } from 'lucide-react';
@@ -12,7 +11,7 @@ const FinalComicView: React.FC<FinalComicViewProps> = ({ project }) => {
   if (panels.length === 0) return null;
 
   const playAudio = (url: string) => {
-      new Audio(url).play();
+      new window.Audio(url).play();
   };
 
   return (
