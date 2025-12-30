@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ComicPanel, Character, ResearchData, StoryFormat, StoryConcept, Message } from "../types";
 import { PROMPTS } from "./prompts";
 
+// The API key must be obtained exclusively from process.env.API_KEY.
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const getTextModel = (tier: 'STANDARD' | 'PREMIUM' = 'STANDARD') => 
