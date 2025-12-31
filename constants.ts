@@ -1,9 +1,10 @@
 
+
 import { Agent, AgentRole, WorkflowStage, ComicProject } from './types';
 
 export const TRANSLATIONS = {
     en: {
-        'app.title': 'Studio AI',
+        'app.title': 'AI Comic Studio',
         'dept.strategy': 'Editorial Dept.',
         'dept.writers': "Writers' Room",
         'dept.visuals': 'Art Studio',
@@ -84,6 +85,7 @@ export const TRANSLATIONS = {
         'manager.title': "Director's Desk",
         'manager.settings': 'Settings',
         'manager.pipeline': 'Pipeline',
+        'manager.lobby': 'Project Lobby',
         'manager.logs': 'Logs',
         'manager.theme': 'Premise',
         'manager.lang': 'Master Lang',
@@ -161,7 +163,7 @@ export const TRANSLATIONS = {
         'err.no_art': 'Art not generated.',
     },
     vi: {
-        'app.title': 'Studio AI',
+        'app.title': 'AI Comic Studio',
         'dept.strategy': 'Ban Biên Tập',
         'dept.writers': "Phòng Kịch Bản",
         'dept.visuals': 'Studio Mỹ Thuật',
@@ -242,6 +244,7 @@ export const TRANSLATIONS = {
         'manager.title': "Bàn Tổng Biên Tập",
         'manager.settings': 'Cấu Hình',
         'manager.pipeline': 'Tiến Độ',
+        'manager.lobby': 'Sảnh Dự Án',
         'manager.logs': 'Nhật Ký',
         'manager.theme': 'Ý Tưởng / Logline',
         'manager.lang': 'Ngôn ngữ Gốc',
