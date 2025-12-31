@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import AgentWorkspace from './components/AgentWorkspace';
@@ -36,9 +37,9 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('ai_comic_theme', theme);
     if (theme === 'dark') {
-      window.document.documentElement.classList.add('dark');
+      document.documentElement.classList.add('dark');
     } else {
-      window.document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove('dark');
     }
   }, [theme]);
 

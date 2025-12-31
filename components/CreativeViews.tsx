@@ -68,7 +68,7 @@ export const ResearchView: React.FC<{
                             <div className="flex gap-2 relative">
                                  <input 
                                     value={researchChatInput}
-                                    onChange={(e) => setResearchChatInput(e.target.value)}
+                                    onChange={(e) => setResearchChatInput((e.target as any).value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleResearchChatSend()}
                                     placeholder={t('planner.chatPlaceholder')}
                                     className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl pl-4 pr-12 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-300 outline-none transition-all"
@@ -236,7 +236,7 @@ export const WriterView: React.FC<{
                                                rows={3}
                                                onChange={(e) => {
                                                    const newPanels = [...panels];
-                                                   newPanels[idx].description = e.target.value;
+                                                   newPanels[idx].description = (e.target as any).value;
                                                    updateProject({ panels: newPanels });
                                                }}
                                            />
@@ -249,7 +249,7 @@ export const WriterView: React.FC<{
                                                rows={2}
                                                onChange={(e) => {
                                                    const newPanels = [...panels];
-                                                   newPanels[idx].dialogue = e.target.value;
+                                                   newPanels[idx].dialogue = (e.target as any).value;
                                                    updateProject({ panels: newPanels });
                                                }}
                                            />
@@ -343,7 +343,7 @@ export const CharacterDesignerView: React.FC<{
                 <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                     <select 
                         value={globalStyle} 
-                        onChange={(e) => setGlobalStyle(e.target.value)}
+                        onChange={(e) => setGlobalStyle((e.target as any).value)}
                         className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-300 outline-none p-2 cursor-pointer max-w-[150px] truncate"
                     >
                         <optgroup label="Manga & Anime">
@@ -476,7 +476,7 @@ export const CharacterDesignerView: React.FC<{
                                      <textarea 
                                          className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-2 text-xs text-gray-600 dark:text-gray-300 focus:border-purple-300 outline-none resize-none h-20"
                                          value={char.description}
-                                         onChange={(e) => handleUpdateCharacterDescription(idx, e.target.value)}
+                                         onChange={(e) => handleUpdateCharacterDescription(idx, (e.target as any).value)}
                                      />
                                  </div>
                                  
@@ -484,7 +484,7 @@ export const CharacterDesignerView: React.FC<{
                                     <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Voice</label>
                                     <select 
                                         value={char.voice || availableVoices[0]} 
-                                        onChange={(e) => handleUpdateCharacterVoice(idx, e.target.value)}
+                                        onChange={(e) => handleUpdateCharacterVoice(idx, (e.target as any).value)}
                                         className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-2 text-xs text-gray-600 dark:text-gray-300 focus:border-purple-300 outline-none"
                                     >
                                         {availableVoices.map(v => <option key={v} value={v}>{v}</option>)}
@@ -500,7 +500,7 @@ export const CharacterDesignerView: React.FC<{
                                         <select 
                                             className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg py-2 px-2 text-xs font-medium text-gray-700 dark:text-gray-300 outline-none"
                                             value={styleSelections[char.id] || project.style}
-                                            onChange={(e) => handleStyleChange(char.id, e.target.value)}
+                                            onChange={(e) => handleStyleChange(char.id, (e.target as any).value)}
                                         >
                                             <optgroup label="Manga & Anime">
                                                 <option value="Japanese Manga (B&W)">{t('style.manga_bw')}</option>
@@ -601,7 +601,7 @@ export const PanelArtistView: React.FC<{
                     <div className="flex items-center gap-3 bg-white dark:bg-gray-800 p-2 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                         <select 
                             value={selectedStyle} 
-                            onChange={(e) => setSelectedStyle(e.target.value)}
+                            onChange={(e) => setSelectedStyle((e.target as any).value)}
                             className="bg-transparent text-sm font-bold text-gray-700 dark:text-gray-300 outline-none p-2 cursor-pointer"
                         >
                             <optgroup label="Manga & Anime">

@@ -1,7 +1,8 @@
+/// <reference lib="dom" />
 import React, { useState } from 'react';
 import { AgentRole, ComicProject, Character, ComicPanel } from '../types';
 import { AGENTS } from '../constants';
-import { Printer, Users, Loader2, ScanFace, CheckCircle, AlertTriangle, Play, Film, FileText, ShieldAlert, Activity, Globe, Plus, BookOpen, Mic, Clapperboard, Download, Megaphone, Share2, Sparkles } from 'lucide-react';
+import { Printer, Users, Loader2, ScanFace, CheckCircle, AlertTriangle, Play, Film, FileText, ShieldAlert, Activity, Globe, Plus, BookOpen, Mic, Clapperboard, Download, Megaphone, Share2, Sparkles, FolderDown, CheckSquare, Square } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import * as GeminiService from '../services/geminiService';
@@ -163,9 +164,30 @@ export const MotionView: React.FC<{
 }> = ({ project, handleGeneratePanelVideo, loading, role, t }) => {
      const [isCompiling, setIsCompiling] = useState(false);
      const [progress, setProgress] = useState(0);
+     const [selectedPanelIds, setSelectedPanelIds] = useState<Set<string>>(new Set());
+     
      const panels = project.panels || [];
 
+     const toggleSelection = (id: string) => {
+         const newSet = new Set(selectedPanelIds);
+         if (newSet.has(id)) {
+             newSet.delete(id);
+         } else {
+             newSet.add(id);
+         }
+         setSelectedPanelIds(newSet);
+     };
+
+     const hasVideos = panels.some(p => p.videoUrl);
+
      const handleCompileMovie = async () => {
+        const videoPanels = panels.filter(p => p.videoUrl && selectedPanelIds.has(p.id));
+        
+        if (videoPanels.length < 2) {
+            (window as any).alert("Please select at least 2 video panels to merge.");
+            return;
+        }
+
         setIsCompiling(true);
         setProgress(0);
         try {
@@ -180,12 +202,6 @@ export const MotionView: React.FC<{
             ffmpeg.on('progress', ({ progress }) => {
                 setProgress(Math.round(progress * 100));
             });
-
-            const videoPanels = panels.filter(p => p.videoUrl);
-            if (videoPanels.length === 0) {
-                window.alert("No generated videos to merge.");
-                return;
-            }
 
             let fileList = '';
             for (let i = 0; i < videoPanels.length; i++) {
@@ -203,23 +219,21 @@ export const MotionView: React.FC<{
             const url = URL.createObjectURL(new Blob([(data as any).buffer], { type: 'video/mp4' }));
 
             // Download
-            const a = window.document.createElement('a');
+            const a = document.createElement('a');
             a.href = url;
-            a.download = `${project.title.replace(/\s+/g, '_')}_MotionComic.mp4`;
-            window.document.body.appendChild(a);
+            a.download = `${project.title.replace(/\s+/g, '_')}_MotionComic_Merged.mp4`;
+            document.body.appendChild(a);
             a.click();
-            window.document.body.removeChild(a);
+            document.body.removeChild(a);
             
         } catch (e: any) {
             console.error(e);
-            window.alert("Video compilation failed. NOTE: Your browser must support 'SharedArrayBuffer' (Desktop Chrome/Edge/Firefox). If on mobile, please download clips individually.");
+            (window as any).alert("Video compilation failed. NOTE: Your browser must support 'SharedArrayBuffer' (Desktop Chrome/Edge/Firefox). If on mobile, please download clips individually.");
         } finally {
             setIsCompiling(false);
             setProgress(0);
         }
      };
-
-     const hasVideos = panels.some(p => p.videoUrl);
 
      return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-24">
@@ -244,7 +258,7 @@ export const MotionView: React.FC<{
                             </>
                         ) : (
                             <>
-                                <Clapperboard className="w-5 h-5"/> {t('ui.finished')} & Export
+                                <Clapperboard className="w-5 h-5"/> Merge Selected ({Array.from(selectedPanelIds).filter(id => panels.find(p => p.id === id)?.videoUrl).length})
                             </>
                         )}
                     </button>
@@ -252,45 +266,58 @@ export const MotionView: React.FC<{
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {panels.map((panel, idx) => (
-                    <div key={panel.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm group">
-                        <div className="aspect-video bg-gray-900 relative">
-                             {panel.videoUrl ? (
-                                 <video src={panel.videoUrl} className="w-full h-full object-cover" controls loop playsInline />
-                             ) : panel.imageUrl ? (
-                                 <img src={panel.imageUrl} className="w-full h-full object-cover opacity-80" />
-                             ) : (
-                                 <div className="flex items-center justify-center h-full text-gray-600"><Film className="w-8 h-8"/></div>
-                             )}
-
-                             {!panel.videoUrl && (
-                                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
-                                     {panel.isGenerating ? (
-                                         <Loader2 className="w-10 h-10 text-white animate-spin"/>
-                                     ) : (
-                                         <button 
-                                            onClick={() => handleGeneratePanelVideo(panel, idx)}
-                                            className="w-12 h-12 rounded-full bg-orange-600 text-white flex items-center justify-center shadow-lg hover:bg-orange-700 transition-all transform group-hover:scale-110"
-                                         >
-                                             <Play className="w-5 h-5 fill-current ml-1"/>
-                                         </button>
-                                     )}
-                                 </div>
-                             )}
-                        </div>
-                        <div className="p-4 flex justify-between items-start">
-                            <div>
-                                <h4 className="font-bold text-sm text-gray-700 dark:text-gray-200 mb-1">Panel #{idx+1}</h4>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{panel.description}</p>
-                            </div>
+                {panels.map((panel, idx) => {
+                    const isSelected = selectedPanelIds.has(panel.id);
+                    return (
+                        <div key={panel.id} className={`bg-white dark:bg-gray-800 border ${isSelected ? 'border-orange-500 ring-2 ring-orange-200 dark:ring-orange-900' : 'border-gray-200 dark:border-gray-700'} rounded-2xl overflow-hidden shadow-sm group relative`}>
+                            {/* Checkbox for merging */}
                             {panel.videoUrl && (
-                                <a href={panel.videoUrl} download={`Panel_${idx+1}.mp4`} className="text-gray-400 hover:text-orange-500" title="Download Clip">
-                                    <Download className="w-4 h-4"/>
-                                </a>
+                                <button 
+                                    onClick={() => toggleSelection(panel.id)}
+                                    className={`absolute top-2 right-2 z-20 p-1.5 rounded-lg shadow-md transition-all ${isSelected ? 'bg-orange-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-400 hover:text-orange-500'}`}
+                                >
+                                    {isSelected ? <CheckSquare className="w-5 h-5"/> : <Square className="w-5 h-5"/>}
+                                </button>
                             )}
+
+                            <div className="aspect-video bg-gray-900 relative">
+                                 {panel.videoUrl ? (
+                                     <video src={panel.videoUrl} className="w-full h-full object-cover" controls loop playsInline />
+                                 ) : panel.imageUrl ? (
+                                     <img src={panel.imageUrl} className="w-full h-full object-cover opacity-80" />
+                                 ) : (
+                                     <div className="flex items-center justify-center h-full text-gray-600"><Film className="w-8 h-8"/></div>
+                                 )}
+
+                                 {!panel.videoUrl && (
+                                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+                                         {panel.isGenerating ? (
+                                             <Loader2 className="w-10 h-10 text-white animate-spin"/>
+                                         ) : (
+                                             <button 
+                                                onClick={() => handleGeneratePanelVideo(panel, idx)}
+                                                className="w-12 h-12 rounded-full bg-orange-600 text-white flex items-center justify-center shadow-lg hover:bg-orange-700 transition-all transform group-hover:scale-110"
+                                             >
+                                                 <Play className="w-5 h-5 fill-current ml-1"/>
+                                             </button>
+                                         )}
+                                     </div>
+                                 )}
+                            </div>
+                            <div className="p-4 flex justify-between items-start">
+                                <div>
+                                    <h4 className="font-bold text-sm text-gray-700 dark:text-gray-200 mb-1">Panel #{idx+1}</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{panel.description}</p>
+                                </div>
+                                {panel.videoUrl && (
+                                    <a href={panel.videoUrl} download={`Panel_${idx+1}.mp4`} className="text-gray-400 hover:text-orange-500" title="Download Clip">
+                                        <Download className="w-4 h-4"/>
+                                    </a>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
      );
@@ -407,11 +434,13 @@ export const PublisherView: React.FC<{
     const handleExportJSON = () => {
         const dataStr = JSON.stringify(project, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-        const linkElement = window.document.createElement('a');
+        const linkElement = document.createElement('a');
         linkElement.setAttribute('href', dataUri);
         linkElement.setAttribute('download', `${project.title.replace(/\s+/g, '_')}_Final.json`);
         linkElement.click();
     };
+
+    const hasVideos = project.panels?.some(p => p.videoUrl);
 
     return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-24">
@@ -425,10 +454,11 @@ export const PublisherView: React.FC<{
                 </div>
                 <div className="flex gap-2">
                      <button onClick={handleExportJSON} className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-gray-300 dark:shadow-none transition-all">
-                        <Download className="w-5 h-5"/> Export JSON
+                        <Download className="w-5 h-5"/> Export Project JSON
                     </button>
+                    {/* REPLACED PUBLISH WITH DOWNLOAD ASSETS BUTTON */}
                     <button className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-amber-200 dark:shadow-none transition-all">
-                        <Megaphone className="w-5 h-5"/> Publish Online
+                        <FolderDown className="w-5 h-5"/> Download Assets
                     </button>
                 </div>
             </div>
@@ -457,10 +487,10 @@ export const PublisherView: React.FC<{
                         </div>
                         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
                              <div>
-                                 <p className="text-xs font-bold text-gray-500 uppercase">Languages</p>
-                                 <p className="font-bold text-gray-800 dark:text-gray-200">{project.targetLanguages?.length || 1}</p>
+                                 <p className="text-xs font-bold text-gray-500 uppercase">Motion Enabled</p>
+                                 <p className="font-bold text-gray-800 dark:text-gray-200">{hasVideos ? 'Yes' : 'No'}</p>
                              </div>
-                             <CheckCircle className="w-6 h-6 text-emerald-500"/>
+                             {hasVideos ? <CheckCircle className="w-6 h-6 text-emerald-500"/> : <Activity className="w-6 h-6 text-gray-300"/>}
                         </div>
                     </div>
                 </div>
@@ -517,11 +547,11 @@ export const TranslatorView: React.FC<{
     role: AgentRole;
     t: (k: string) => string;
 }> = ({ project, updateProject, handleAddLanguage, loading, role, t }) => {
-    const [newLangInput, setNewLangInput] = React.useState('');
+    const [langInput, setLangInput] = useState('');
 
     return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-24">
-             <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-6">
                     <img src={AGENTS[role].avatar} className="w-16 h-16 rounded-full border-2 border-cyan-500 shadow-md" />
                     <div>
@@ -531,71 +561,54 @@ export const TranslatorView: React.FC<{
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                 <div className="lg:col-span-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm h-fit">
-                     <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                         <Globe className="w-5 h-5 text-cyan-600 dark:text-cyan-400"/> Languages
-                     </h3>
-                     <div className="space-y-3 mb-6">
-                         {project.targetLanguages.map(lang => (
-                             <div key={lang} className="flex items-center justify-between p-3 rounded-xl border bg-cyan-50 dark:bg-cyan-900/30 border-cyan-100 dark:border-cyan-800 text-cyan-800 dark:text-cyan-300">
-                                 <span className="font-bold text-sm">{lang}</span>
-                                 {lang === project.masterLanguage && <span className="text-[10px] bg-white dark:bg-gray-700 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-700 font-bold uppercase text-cyan-600 dark:text-cyan-400">Master</span>}
-                             </div>
-                         ))}
-                     </div>
-                     
-                     <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
-                         <label className="text-[10px] font-bold text-gray-400 uppercase block mb-2">{t('ui.add_lang')}</label>
-                         <div className="flex gap-2">
-                             <input 
-                                value={newLangInput}
-                                onChange={(e) => setNewLangInput(e.target.value)}
-                                placeholder="e.g. Spanish"
-                                className="flex-1 text-sm p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:border-cyan-400"
-                             />
-                             <button 
-                                onClick={() => { handleAddLanguage(newLangInput); setNewLangInput(''); }}
-                                disabled={loading || !newLangInput.trim()}
-                                className="bg-cyan-600 hover:bg-cyan-700 text-white p-2 rounded-lg transition-colors disabled:opacity-50"
-                             >
-                                 {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>}
-                             </button>
-                         </div>
-                     </div>
-                 </div>
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
+                <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-cyan-600"/> Language Management
+                </h3>
+                
+                <div className="flex gap-4 mb-8">
+                    <div className="flex-1">
+                        <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Master Language</label>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 font-bold text-gray-700 dark:text-gray-300">
+                            {project.masterLanguage}
+                        </div>
+                    </div>
+                    <div className="flex-[2]">
+                        <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Target Languages</label>
+                        <div className="flex flex-wrap gap-2">
+                            {project.targetLanguages.map(lang => (
+                                <span key={lang} className="px-3 py-2 rounded-xl bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border border-cyan-100 dark:border-cyan-800 font-bold text-sm">
+                                    {lang}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
 
-                 <div className="lg:col-span-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm">
-                     <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
-                         <BookOpen className="w-5 h-5 text-cyan-600 dark:text-cyan-400"/> Content Preview
-                     </h3>
-                     {project.panels.length === 0 ? (
-                         <div className="text-center text-gray-400 py-12 italic">No panels content to translate yet.</div>
-                     ) : (
-                         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                             {project.panels.map((panel, idx) => (
-                                 <div key={panel.id} className="p-4 border border-gray-100 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900/50 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                     <div className="flex items-center gap-2 mb-2">
-                                         <span className="bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-[10px] font-bold px-2 py-0.5 rounded-full">Panel #{idx+1}</span>
-                                         <span className="text-xs text-gray-400 font-mono truncate flex-1">{panel.description.substring(0, 50)}...</span>
-                                     </div>
-                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                         <div>
-                                             <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Original ({project.masterLanguage})</label>
-                                             <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">{panel.dialogue || <span className="text-gray-300 dark:text-gray-600 italic">No dialogue</span>}</p>
-                                         </div>
-                                         {project.targetLanguages.filter(l => l !== project.masterLanguage).map(lang => (
-                                             <div key={lang}>
-                                                 <label className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 uppercase block mb-1">{lang}</label>
-                                                 <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2 rounded border border-cyan-100 dark:border-cyan-900/50">{panel.translations?.[lang]?.dialogue || <span className="text-gray-300 dark:text-gray-600 italic">Pending...</span>}</p>
-                                             </div>
-                                         ))}
-                                     </div>
-                                 </div>
-                             ))}
-                         </div>
-                     )}
-                 </div>
+                <div className="flex gap-2 items-end border-t border-gray-100 dark:border-gray-700 pt-6">
+                     <div className="flex-1">
+                        <label className="text-xs font-bold text-gray-400 uppercase block mb-2">{t('ui.add_lang')}</label>
+                        <input 
+                            value={langInput}
+                            onChange={(e) => setLangInput(e.target.value)}
+                            placeholder="e.g. French, Spanish..."
+                            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-cyan-100 dark:focus:ring-cyan-900"
+                        />
+                     </div>
+                     <button 
+                        onClick={() => {
+                            if(langInput.trim()) {
+                                handleAddLanguage(langInput.trim());
+                                setLangInput('');
+                            }
+                        }}
+                        disabled={loading || !langInput.trim()}
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-cyan-200 dark:shadow-none transition-all disabled:opacity-50 h-[46px]"
+                     >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>}
+                        {t('ui.translate')}
+                     </button>
+                </div>
             </div>
         </div>
     );

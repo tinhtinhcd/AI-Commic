@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { useState, useRef, useEffect } from 'react';
 import { ComicProject, AgentRole, SystemLog } from '../types';
 import { INITIAL_PROJECT_STATE } from '../constants';
@@ -58,11 +59,11 @@ export const useProjectManagement = (
             } else {
                 setSaveStatus('ERROR');
                 if (result.message === 'SLOTS_FULL') {
-                    window.alert("Dashboard Slots Full (Max 3). Delete an old project to save a new one.");
+                    (window as any).alert("Dashboard Slots Full (Max 3). Delete an old project to save a new one.");
                 } else if (result.message === 'DISK_FULL') {
-                    window.alert("Disk Full! Your device is running out of storage space.");
+                    (window as any).alert("Disk Full! Your device is running out of storage space.");
                 } else {
-                    window.alert("Save failed: " + result.message);
+                    (window as any).alert("Save failed: " + result.message);
                 }
             }
         } catch (e) {
@@ -72,7 +73,7 @@ export const useProjectManagement = (
     };
 
     const handleLoadWIP = (p: ComicProject) => {
-        if (window.confirm("Load this project? Unsaved changes in current workspace will be lost.")) {
+        if ((window as any).confirm("Load this project? Unsaved changes in current workspace will be lost.")) {
             updateProject(p);
             addLog(AgentRole.PROJECT_MANAGER, `Loaded Workspace: ${p.title}`, 'info');
         }
@@ -80,7 +81,7 @@ export const useProjectManagement = (
 
     const handleDeleteWIP = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        if (window.confirm("Delete this project permanently? This action cannot be undone.")) {
+        if ((window as any).confirm("Delete this project permanently? This action cannot be undone.")) {
             await StorageService.deleteActiveProject(id);
             await refreshLists();
 
@@ -99,7 +100,7 @@ export const useProjectManagement = (
     };
 
     const handleDeleteFromLibrary = async (id: string) => {
-        if (window.confirm("Permanently delete this archived project?")) {
+        if ((window as any).confirm("Permanently delete this archived project?")) {
             await StorageService.deleteProjectFromLibrary(id);
             setLibrary(prev => prev.filter(p => p.id !== id));
         }
@@ -110,12 +111,12 @@ export const useProjectManagement = (
         try {
             const zipBlob = await StorageService.exportProjectToZip(project);
             const url = URL.createObjectURL(zipBlob);
-            const link = window.document.createElement('a');
+            const link = document.createElement('a');
             link.href = url;
             link.download = `${project.title || 'Project'}_Backup.zip`;
-            window.document.body.appendChild(link);
+            document.body.appendChild(link);
             link.click();
-            window.document.body.removeChild(link);
+            document.body.removeChild(link);
             URL.revokeObjectURL(url);
             addLog(AgentRole.PROJECT_MANAGER, "Backup exported successfully.", 'success');
         } catch (e) {
@@ -125,7 +126,7 @@ export const useProjectManagement = (
     };
 
     const handleImportProjectZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
+        const file = (e.target as any).files?.[0];
         if (!file) return;
         
         addLog(AgentRole.PROJECT_MANAGER, "Unzipping and restoring project...", 'info');
@@ -135,12 +136,12 @@ export const useProjectManagement = (
             
             if (!saveResult.success) {
                 if (saveResult.message === 'SLOTS_FULL') {
-                    if(window.confirm("Dashboard slots are full. Load into temporary workspace only? (Will NOT be saved)")) {
+                    if((window as any).confirm("Dashboard slots are full. Load into temporary workspace only? (Will NOT be saved)")) {
                          updateProject(loadedProject);
                          addLog(AgentRole.PROJECT_MANAGER, "Project loaded temporarily.", 'warning');
                     }
                 } else {
-                    window.alert("Could not save imported project: " + saveResult.message);
+                    (window as any).alert("Could not save imported project: " + saveResult.message);
                 }
             } else {
                 updateProject(loadedProject);
@@ -149,7 +150,7 @@ export const useProjectManagement = (
             }
         } catch (e: any) {
             console.error(e);
-            window.alert("Import failed: " + e.message);
+            (window as any).alert("Import failed: " + e.message);
             addLog(AgentRole.PROJECT_MANAGER, "Import failed: " + e.message, 'error');
         }
     };

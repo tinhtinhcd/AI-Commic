@@ -1,11 +1,39 @@
-
-
 import { GoogleGenAI } from "@google/genai";
 import { ComicPanel, Character, ResearchData, StoryFormat, StoryConcept, Message, ComicProject } from "../types";
 import { PROMPTS } from "./prompts";
 
-// The API key must be obtained exclusively from process.env.API_KEY.
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+interface StoredKey {
+    id: string;
+    key: string;
+    timestamp: number;
+    isActive: boolean;
+}
+
+// HELPER: Get API Key with priority: LocalStorage (Active User Key) > Environment (System)
+export const getDynamicApiKey = (): string => {
+    try {
+        const rawStore = localStorage.getItem('ai_comic_keystore_v2');
+        if (rawStore) {
+            const keys: StoredKey[] = JSON.parse(rawStore);
+            const activeKey = keys.find(k => k.isActive);
+            if (activeKey && activeKey.key.trim().length > 0) {
+                return activeKey.key.trim();
+            }
+        }
+        
+        // Fallback to legacy single key if v2 doesn't exist
+        const legacyKey = localStorage.getItem('ai_comic_user_api_key');
+        if (legacyKey && legacyKey.trim().length > 0) return legacyKey.trim();
+
+    } catch (e) {
+        console.error("Error reading API key store", e);
+    }
+
+    return process.env.API_KEY || '';
+};
+
+// Initialize AI with dynamic key
+const getAI = () => new GoogleGenAI({ apiKey: getDynamicApiKey() });
 
 const getTextModel = (tier: 'STANDARD' | 'PREMIUM' = 'STANDARD') => 
     tier === 'PREMIUM' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
@@ -262,7 +290,9 @@ export const generatePanelVideo = async (panel: ComicPanel, style: string): Prom
     }
     const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (videoUri) {
-        const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
+        // USE DYNAMIC KEY HERE
+        const apiKey = getDynamicApiKey();
+        const response = await fetch(`${videoUri}&key=${apiKey}`);
         const blob = await response.blob();
         return URL.createObjectURL(blob);
     }

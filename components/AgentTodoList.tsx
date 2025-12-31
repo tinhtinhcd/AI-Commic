@@ -121,7 +121,7 @@ const AgentTodoList: React.FC<AgentTodoListProps> = ({ role, project, updateProj
                 <div className="flex gap-2">
                     <input 
                         value={newTask}
-                        onChange={(e) => setNewTask(e.target.value)}
+                        onChange={(e) => setNewTask((e.target as any).value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
                         placeholder={t('ui.add_task') + "..."}
                         className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs outline-none focus:border-indigo-300 dark:focus:border-indigo-500 transition-colors focus:bg-white dark:focus:bg-gray-900 text-gray-700 dark:text-gray-200 placeholder-gray-400"

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+/// <reference lib="dom" />
+import React, { useState, useEffect } from 'react';
 import { ComicProject, WorkflowStage, ChapterArchive } from '../types';
 import { AGENTS } from '../constants';
-import { Settings, ArrowLeft, FileText, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Plus, Trash2, ArrowRight, RotateCcw, AlertTriangle, Zap, Star, Map, Edit, Eye, Lock, Lightbulb } from 'lucide-react';
+import { Settings, ArrowLeft, FileText, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Plus, Trash2, ArrowRight, RotateCcw, AlertTriangle, Zap, Star, Map, Edit, Eye, Lock, Lightbulb, Key, Calendar } from 'lucide-react';
 
 interface ManagerViewProps {
     project: ComicProject;
@@ -27,6 +28,13 @@ interface ManagerViewProps {
     supportedLanguages: string[];
 }
 
+interface StoredKey {
+    id: string;
+    key: string;
+    timestamp: number;
+    isActive: boolean;
+}
+
 export const ManagerView: React.FC<ManagerViewProps> = ({ 
     project, activeProjects, updateProject, handleLoadWIP, handleDeleteWIP, 
     handleStartResearch, handleApproveResearchAndScript, handleApproveScriptAndVisualize, handleFinalizeProduction,
@@ -37,6 +45,70 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
     
     const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'CHAPTERS' | 'SETTINGS'>('DASHBOARD');
     const [selectedChapterId, setSelectedChapterId] = useState<number>(project.currentChapter || 1);
+    
+    // API KEY MANAGEMENT STATE
+    const [apiKeyInput, setApiKeyInput] = useState('');
+    const [storedKeys, setStoredKeys] = useState<StoredKey[]>([]);
+
+    useEffect(() => {
+        loadKeys();
+    }, []);
+
+    const loadKeys = () => {
+        try {
+            const raw = localStorage.getItem('ai_comic_keystore_v2');
+            if (raw) {
+                const parsed: StoredKey[] = JSON.parse(raw);
+                // Sort by timestamp descending (newest first)
+                setStoredKeys(parsed.sort((a, b) => b.timestamp - a.timestamp));
+            }
+        } catch (e) {
+            console.error("Failed to load keys", e);
+        }
+    };
+
+    const handleAddKey = () => {
+        if (!apiKeyInput.trim()) return;
+        
+        // Deactivate others if this is the first key, or user preference logic
+        const newKeys = storedKeys.map(k => ({...k, isActive: false})); // Reset active
+        
+        const newKeyEntry: StoredKey = {
+            id: crypto.randomUUID(),
+            key: apiKeyInput.trim(),
+            timestamp: Date.now(),
+            isActive: true // Make new key active by default
+        };
+        
+        const updated = [newKeyEntry, ...newKeys];
+        localStorage.setItem('ai_comic_keystore_v2', JSON.stringify(updated));
+        setStoredKeys(updated);
+        setApiKeyInput('');
+        (window as any).alert("New API Key added and set as Active.");
+    };
+
+    const handleSelectKey = (id: string) => {
+        const updated = storedKeys.map(k => ({
+            ...k,
+            isActive: k.id === id
+        }));
+        localStorage.setItem('ai_comic_keystore_v2', JSON.stringify(updated));
+        setStoredKeys(updated);
+    };
+
+    const handleDeleteKey = (id: string) => {
+        if(!(window as any).confirm("Delete this API Key?")) return;
+        
+        let updated = storedKeys.filter(k => k.id !== id);
+        
+        // If we deleted the active key, make the newest one active
+        if (storedKeys.find(k => k.id === id)?.isActive && updated.length > 0) {
+            updated[0].isActive = true;
+        }
+        
+        localStorage.setItem('ai_comic_keystore_v2', JSON.stringify(updated));
+        setStoredKeys(updated);
+    };
 
     // DASHBOARD SELECTION MODE (New Project / Load Project)
     if (!project.storyFormat) {
@@ -281,11 +353,73 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                 <div className="w-full flex flex-col h-full overflow-hidden">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm flex-1 overflow-y-auto">
                         <div className="space-y-6 max-w-2xl">
+                            {/* API KEY SECTION */}
+                            <div className="bg-blue-50 dark:bg-blue-900/10 p-5 rounded-xl border border-blue-100 dark:border-blue-900">
+                                <label className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-2 block flex items-center gap-2">
+                                    <Key className="w-4 h-4"/> Gemini API Key Management
+                                </label>
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                                    Hệ thống dùng Free Key mặc định (dễ hết quota). Hãy nhập thêm Key cá nhân của bạn để sử dụng ổn định hơn.
+                                </p>
+                                
+                                {/* ADD NEW KEY */}
+                                <div className="flex gap-2 mb-4">
+                                    <div className="relative flex-1">
+                                        <input 
+                                            type="password"
+                                            value={apiKeyInput}
+                                            onChange={(e) => setApiKeyInput((e.target as HTMLInputElement).value)}
+                                            placeholder="Paste new API Key here..."
+                                            className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <button onClick={handleAddKey} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors flex items-center gap-1">
+                                        <Plus className="w-3 h-3"/> Add Key
+                                    </button>
+                                </div>
+
+                                {/* KEY LIST */}
+                                {storedKeys.length > 0 ? (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                                        {storedKeys.map((k) => (
+                                            <div key={k.id} className={`flex items-center justify-between p-2 rounded-lg border text-xs ${k.isActive ? 'bg-white dark:bg-gray-800 border-blue-400 dark:border-blue-500 shadow-sm' : 'bg-gray-100 dark:bg-gray-900/50 border-transparent text-gray-500'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <input 
+                                                        type="radio" 
+                                                        name="activeKey" 
+                                                        checked={k.isActive} 
+                                                        onChange={() => handleSelectKey(k.id)}
+                                                        className="cursor-pointer"
+                                                    />
+                                                    <div>
+                                                        <p className="font-bold flex items-center gap-2">
+                                                            {k.isActive ? <span className="text-blue-600 dark:text-blue-400">Active Key</span> : "Stored Key"}
+                                                            {k.isActive && <CheckCircle className="w-3 h-3 text-blue-500"/>}
+                                                        </p>
+                                                        <p className="text-[10px] opacity-70 flex items-center gap-1">
+                                                            <Calendar className="w-3 h-3"/>
+                                                            Added: {new Date(k.timestamp).toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => handleDeleteKey(k.id)} className="text-gray-400 hover:text-red-500 p-1">
+                                                    <Trash2 className="w-4 h-4"/>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-4 bg-white/50 dark:bg-gray-900/30 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
+                                        <p className="text-xs text-gray-400">No custom keys added. Using system default.</p>
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-2 block">{t('manager.theme')}</label>
                                 <textarea
                                     value={project.theme || inputText}
-                                    onChange={(e) => { setInputText(e.target.value); updateProject({ theme: e.target.value }); }}
+                                    onChange={(e) => { setInputText((e.target as HTMLTextAreaElement).value); updateProject({ theme: (e.target as HTMLTextAreaElement).value }); }}
                                     className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-sm text-gray-900 dark:text-gray-100 min-h-[100px] outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900"
                                 />
                             </div>
@@ -353,7 +487,7 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                 <div className="flex items-center gap-3"><Palette className="w-4 h-4"/><span className="font-bold">{t('action.approve_art')}</span></div>
                             </button>
                             
-                            <button onClick={handleFinalizeProduction} disabled={loading || !project.panels.some(p => p.imageUrl) || project.workflowStage !== WorkflowStage.PRINTING} className={`w-full py-4 px-5 rounded-xl flex items-center justify-between text-sm font-medium border transition-all ${project.workflowStage === WorkflowStage.PRINTING ? 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-200 shadow-md shadow-gray-200 dark:shadow-none' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}>
+                            <button onClick={handleFinalizeProduction} disabled={loading || !project.panels.some(p => p.imageUrl) || project.workflowStage === WorkflowStage.PRINTING} className={`w-full py-4 px-5 rounded-xl flex items-center justify-between text-sm font-medium border transition-all ${project.workflowStage === WorkflowStage.PRINTING ? 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-200 shadow-md shadow-gray-200 dark:shadow-none' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}>
                                 <div className="flex items-center gap-3"><Printer className="w-4 h-4"/><span className="font-bold">{t('action.start_printing')}</span></div>
                             </button>
 
@@ -392,6 +526,6 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
-    );
-};
+        );
+    }
+}

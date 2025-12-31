@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentRole, ComicProject, ComicPanel, Character, WorkflowStage, SystemLog, ResearchData, StoryFormat, StoryConcept, Message, ChapterArchive, AgentTask, CharacterVariant } from '../types';
 import { AGENTS, TRANSLATIONS, INITIAL_PROJECT_STATE } from '../constants';
@@ -210,7 +211,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
 
 
   const handleImportManuscript = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
+      const file = (e.target as any).files?.[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -554,7 +555,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           }
 
           if (textToAnalyze.length < 50) {
-               window.alert("Chưa có nội dung kịch bản để phân tích. (Script is empty)");
+               (window as any).alert("Chưa có nội dung kịch bản để phân tích. (Script is empty)");
                setLoading(false);
                return;
           }
@@ -649,13 +650,13 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           throw e; 
       }
   };
-  const handleExportScript = () => { const dataStr = JSON.stringify(project.panels, null, 2); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const linkElement = window.document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', `${project.title || 'comic'}_ch${project.currentChapter || 1}_script.json`); linkElement.click(); };
-  const handleImportScript = (e: React.ChangeEvent<HTMLInputElement>) => { const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event) => { try { const importedPanels = JSON.parse(event.target?.result as string); if (Array.isArray(importedPanels)) { updateProject({ panels: importedPanels, workflowStage: WorkflowStage.CENSORING_SCRIPT }); addLog(AgentRole.SCRIPTWRITER, `Script imported.`, 'success'); } } catch (err) {} }; reader.readAsText(file); };
+  const handleExportScript = () => { const dataStr = JSON.stringify(project.panels, null, 2); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', `${project.title || 'comic'}_ch${project.currentChapter || 1}_script.json`); linkElement.click(); };
+  const handleImportScript = (e: React.ChangeEvent<HTMLInputElement>) => { const file = (e.target as any).files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event) => { try { const importedPanels = JSON.parse(event.target?.result as string); if (Array.isArray(importedPanels)) { updateProject({ panels: importedPanels, workflowStage: WorkflowStage.CENSORING_SCRIPT }); addLog(AgentRole.SCRIPTWRITER, `Script imported.`, 'success'); } } catch (err) {} }; reader.readAsText(file); };
   const handleApproveResearchAndScript = async () => { onAgentChange(AgentRole.SCRIPTWRITER); setLoading(true); try { await handleGenerateConcept(); await handleGenerateCast(); await handleGenerateFinalScript(); } catch (e) { console.error(e); } finally { setLoading(false); } };
   
   const handleApproveScriptAndVisualize = async () => { 
       // Replaced by auto-transition, but kept for manual trigger
-      if (project.isCensored) { window.alert("Script unsafe."); return; } 
+      if (project.isCensored) { (window as any).alert("Script unsafe."); return; } 
       updateProject({ workflowStage: WorkflowStage.DESIGNING_CHARACTERS }); 
       addLog(AgentRole.PROJECT_MANAGER, `Manually advancing to Character Design.`, 'info'); 
       onAgentChange(AgentRole.CHARACTER_DESIGNER); 
@@ -664,7 +665,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   const handleGenerateAllCharacters = async (selectedStyle: string) => {
       // 1. Validation
       if (!project.characters || project.characters.length === 0) {
-          window.alert("No characters found. Please ensure the Cast has been generated in the Scriptwriter step.");
+          (window as any).alert("No characters found. Please ensure the Cast has been generated in the Scriptwriter step.");
           return;
       }
 
@@ -924,11 +925,11 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   const handleUpdateCharacterDescription = (index: number, value: string) => { const newChars = [...project.characters]; newChars[index] = { ...newChars[index], description: value }; updateProject({ characters: newChars }); };
   const handleUpdateCharacterVoice = (index: number, voice: string) => { const newChars = [...project.characters]; newChars[index] = { ...newChars[index], voice }; updateProject({ characters: newChars }); };
   const toggleCharacterLock = (charId: string) => { const newChars = project.characters.map(c => { if (c.id === charId) return { ...c, isLocked: !c.isLocked }; return c; }); updateProject({ characters: newChars }); };
-  const handleCharacterUpload = async (e: React.ChangeEvent<HTMLInputElement>, charIndex: number) => { const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return; const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const newChars = [...project.characters]; newChars[charIndex] = { ...newChars[charIndex], imageUrl: base64, isGenerating: false, isLocked: true }; updateProject({ characters: newChars }); }; reader.readAsDataURL(file); };
+  const handleCharacterUpload = async (e: React.ChangeEvent<HTMLInputElement>, charIndex: number) => { const file = (e.target as any).files?.[0]; if (!file) return; const reader = new FileReader(); reader.onloadend = async () => { const base64 = reader.result as string; const newChars = [...project.characters]; newChars[charIndex] = { ...newChars[charIndex], imageUrl: base64, isGenerating: false, isLocked: true }; updateProject({ characters: newChars }); }; reader.readAsDataURL(file); };
   const handleCheckConsistency = async (char: Character, index: number) => { if (!char.imageUrl) return; await checkApiKeyRequirement(); const newChars = [...project.characters]; newChars[index] = { ...newChars[index], isGenerating: true }; updateProject({ characters: newChars }); try { const result = await GeminiService.analyzeCharacterConsistency(char.imageUrl, project.style, char.name, project.modelTier || 'STANDARD'); newChars[index] = { ...newChars[index], isGenerating: false, consistencyStatus: result.isConsistent ? 'PASS' : 'FAIL', consistencyReport: result.critique }; addLog(AgentRole.CHARACTER_DESIGNER, `Consistency check for ${char.name}: ${result.isConsistent ? 'PASS' : 'FAIL'}`, result.isConsistent ? 'success' : 'warning'); } catch (e: any) { newChars[index] = { ...newChars[index], isGenerating: false }; addLog(AgentRole.CHARACTER_DESIGNER, `Check failed: ${e.message}`, 'error'); } updateProject({ characters: newChars }); };
   
   const handleCompleteChapterAndNext = async () => { 
-      if(!window.confirm("Archive current panels and start next chapter?")) return; 
+      if(!(window as any).confirm("Archive current panels and start next chapter?")) return; 
       setLoading(true); 
       try { 
           const summary = await GeminiService.summarizeChapter(project.panels, project.modelTier || 'STANDARD'); 
@@ -1014,7 +1015,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
   
   // ROBUST REVERT STAGE
   const handleRevertStage = () => { 
-      if (!window.confirm("Are you sure you want to revert to the previous stage?")) return;
+      if (!(window as any).confirm("Are you sure you want to revert to the previous stage?")) return;
       const currentIdx = getCurrentStageIndex(); 
       if (currentIdx > 0) { 
           const prevStage = WORKFLOW_ORDER[currentIdx - 1]; 
@@ -1039,7 +1040,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
 
       // Check if current work exists and is unsaved/unarchived
       if (project.panels.length > 0) {
-          const confirmSwitch = window.confirm(`Switching to Chapter ${chapterNum} will archive current Chapter ${project.currentChapter}. Continue?`);
+          const confirmSwitch = (window as any).confirm(`Switching to Chapter ${chapterNum} will archive current Chapter ${project.currentChapter}. Continue?`);
           if (!confirmSwitch) return;
           
           // Archive current
@@ -1092,7 +1093,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
                         <div>
                             <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">{t(AGENTS[role].name)}</h2>
                             <div className="flex items-center gap-2">
-                                {project.panels.length > 0 && (<div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-3 py-1 rounded-full shadow-sm flex items-center gap-2"><Globe className="w-3 h-3 text-gray-400"/><span className="text-xs text-gray-500 dark:text-gray-300 font-bold uppercase">{t('ui.reviewing')}:</span><select value={project.activeLanguage} onChange={(e) => switchProjectLanguage(e.target.value)} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-transparent outline-none cursor-pointer">{project.targetLanguages.map(l => <option key={l} value={l}>{l}</option>)}</select></div>)}
+                                {project.panels.length > 0 && (<div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-3 py-1 rounded-full shadow-sm flex items-center gap-2"><Globe className="w-3 h-3 text-gray-400"/><span className="text-xs text-gray-500 dark:text-gray-300 font-bold uppercase">{t('ui.reviewing')}:</span><select value={project.activeLanguage} onChange={(e) => switchProjectLanguage((e.target as any).value)} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-transparent outline-none cursor-pointer">{project.targetLanguages.map(l => <option key={l} value={l}>{l}</option>)}</select></div>)}
                             </div>
                         </div>
                     </div>
