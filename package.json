@@ -1,3 +1,4 @@
+
 {
   "name": "ai-comic-studio",
   "private": true,
@@ -5,7 +6,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:studio": "TARGET=studio vite",
+    "dev:reader": "TARGET=reader vite",
+    "dev:admin": "TARGET=admin vite",
     "build": "vite build",
+    "build:landing": "TARGET=landing vite build",
+    "build:studio": "TARGET=studio vite build",
+    "build:reader": "TARGET=reader vite build",
+    "build:admin": "TARGET=admin vite build",
     "preview": "vite preview"
   },
   "dependencies": {

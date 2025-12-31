@@ -5,15 +5,14 @@ import Sidebar from './components/Sidebar';
 import AgentWorkspace from './components/AgentWorkspace';
 import FinalComicView from './components/FinalComicView';
 import { LoginScreen } from './components/LoginScreen';
-import { ReaderApp } from './components/ReaderApp';
 import { AgentRole, ComicProject, UserProfile } from './types';
 import { INITIAL_PROJECT_STATE } from './constants';
 import * as AuthService from './services/authService';
 import { Menu, X, Maximize2, Minimize2 } from 'lucide-react';
+import { Logo } from './components/Logo';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [isReaderMode, setIsReaderMode] = useState(false); // NEW STATE FOR READER PORTAL
   
   const [activeRole, setActiveRole] = useState<AgentRole>(AgentRole.PROJECT_MANAGER);
   const [project, setProject] = useState<ComicProject>(INITIAL_PROJECT_STATE);
@@ -21,7 +20,6 @@ const App: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  // Initialize Auth
   useEffect(() => {
       const user = AuthService.getCurrentUser();
       if (user) setCurrentUser(user);
@@ -29,8 +27,6 @@ const App: React.FC = () => {
 
   const handleLogin = (user: UserProfile) => {
       setCurrentUser(user);
-      setIsReaderMode(false);
-      // Reset project state to clean slate on login (or load from their last session in future)
       setProject({ ...INITIAL_PROJECT_STATE, ownerId: user.id });
   };
 
@@ -50,7 +46,6 @@ const App: React.FC = () => {
       }
   };
 
-  // Initialize Language from localStorage (Default: 'vi')
   const [uiLanguage, setUiLanguage] = useState<'en' | 'vi'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('ai_comic_lang') as 'en' | 'vi') || 'vi';
@@ -58,7 +53,6 @@ const App: React.FC = () => {
     return 'vi';
   });
 
-  // Initialize Theme from localStorage (Default: 'light')
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('ai_comic_theme') as 'light' | 'dark') || 'light';
@@ -70,7 +64,6 @@ const App: React.FC = () => {
     setProject(prev => ({ ...prev, ...updates }));
   };
 
-  // Persist Theme changes
   useEffect(() => {
     localStorage.setItem('ai_comic_theme', theme);
     if (theme === 'dark') {
@@ -80,27 +73,20 @@ const App: React.FC = () => {
     }
   }, [theme]);
 
-  // Persist Language changes
   useEffect(() => {
     localStorage.setItem('ai_comic_lang', uiLanguage);
   }, [uiLanguage]);
 
-  // --- VIEW LOGIC ---
+  const handleGoToReader = () => {
+      window.location.href = '/reader/';
+  };
 
-  // 1. Reader Mode (No Auth Required)
-  if (isReaderMode) {
-      return <ReaderApp onExit={() => setIsReaderMode(false)} />;
-  }
-
-  // 2. Auth Gate
   if (!currentUser) {
-      return <LoginScreen onLogin={handleLogin} onEnterReader={() => setIsReaderMode(true)} />;
+      return <LoginScreen onLogin={handleLogin} onEnterReader={handleGoToReader} />;
   }
 
-  // 3. Studio Mode (Authenticated)
   return (
     <div className={`flex h-screen font-sans transition-colors duration-300 ${theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Full Screen Toggle (Floating) */}
       <button 
           onClick={toggleFullScreen}
           className="fixed bottom-4 left-4 z-50 p-3 bg-gray-900 text-white dark:bg-white dark:text-gray-900 rounded-full shadow-lg hover:scale-110 transition-transform opacity-50 hover:opacity-100"
@@ -109,7 +95,6 @@ const App: React.FC = () => {
           {isFullScreen ? <Minimize2 className="w-5 h-5"/> : <Maximize2 className="w-5 h-5"/>}
       </button>
 
-      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 bg-gray-900/20 backdrop-blur-sm lg:hidden" onClick={() => setMobileMenuOpen(false)}>
            <div className={`absolute left-0 top-0 bottom-0 w-64 shadow-2xl transition-colors ${theme === 'dark' ? 'bg-gray-800 border-r border-gray-700' : 'bg-white'}`}>
@@ -128,7 +113,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Desktop Sidebar */}
       <div className="hidden lg:block h-full flex-shrink-0">
          <Sidebar 
             currentRole={activeRole} 
@@ -143,16 +127,17 @@ const App: React.FC = () => {
          />
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative transition-all duration-300">
-        {/* Mobile Header */}
         <div className={`lg:hidden p-4 border-b flex items-center justify-between shadow-sm z-10 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-           <button onClick={() => setMobileMenuOpen(true)}>
-             <Menu className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
-           </button>
-           <span className="font-bold text-sm truncate max-w-[150px]">{project.title}</span>
-           <button onClick={() => setShowPreview(!showPreview)} className={`text-xs px-3 py-1 rounded font-medium border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
-              {showPreview ? 'Hide' : 'View'} Comic
+           <div className="flex items-center gap-3 overflow-hidden">
+               <button onClick={() => setMobileMenuOpen(true)} className="shrink-0">
+                 <Menu className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
+               </button>
+               <Logo className="w-6 h-6 shrink-0" />
+               <span className="font-bold text-sm truncate">{project.title}</span>
+           </div>
+           <button onClick={() => setShowPreview(!showPreview)} className={`ml-2 shrink-0 text-xs px-3 py-1 rounded font-medium border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+              {showPreview ? 'Hide' : 'View'}
            </button>
         </div>
 
@@ -168,7 +153,6 @@ const App: React.FC = () => {
            />
         </div>
 
-        {/* Preview Sidebar (Desktop Only toggle) */}
         {showPreview && (
           <div className="hidden lg:block">
             <FinalComicView project={project} />

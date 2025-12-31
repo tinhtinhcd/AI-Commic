@@ -1,64 +1,19 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Comic Studio</title>
+    <title>AI Comic Studio - Ecosystem</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              comic: ['Comic Sans MS', 'Chalkboard SE', 'sans-serif'],
-            }
-          }
-        }
-      }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-      body { font-family: 'Inter', sans-serif; }
-      /* Professional Light Scrollbar */
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-      
-      .dark ::-webkit-scrollbar-thumb { background: #475569; }
-      .dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-      
-      .custom-scrollbar::-webkit-scrollbar { height: 4px; }
-      .bubble-tail::after {
-        content: '';
-        position: absolute;
-        bottom: -10px;
-        left: 50%;
-        margin-left: -10px;
-        border-width: 10px 10px 0;
-        border-style: solid;
-        border-color: #fff transparent transparent transparent;
-        z-index: 10;
-      }
-      .bubble-tail::before {
-        content: '';
-        position: absolute;
-        bottom: -13px;
-        left: 50%;
-        margin-left: -10px;
-        border-width: 10px 10px 0;
-        border-style: solid;
-        border-color: #111827 transparent transparent transparent;
-        z-index: 9;
-      }
-    </style>
-<script type="importmap">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+  <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "dom": "https://esm.sh/dom@^0.0.3",
     "react/": "https://esm.sh/react@^19.2.3/",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
@@ -67,13 +22,54 @@
     "@ffmpeg/util": "https://esm.sh/@ffmpeg/util@^0.12.2",
     "vite": "https://esm.sh/vite@^7.3.0",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "dom": "https://esm.sh/dom@^0.0.3"
+    "path": "https://esm.sh/path@^0.12.7"
   }
 }
 </script>
 </head>
-  <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 h-screen overflow-hidden antialiased selection:bg-blue-100 selection:text-blue-700 dark:selection:bg-blue-900 dark:selection:text-blue-200">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+  <body class="bg-gray-950 text-white h-screen flex flex-col items-center justify-center overflow-hidden relative">
+    
+    <!-- Background FX -->
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/40 via-gray-950 to-gray-950 z-0"></div>
+    <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 z-0"></div>
+
+    <div class="z-10 text-center space-y-12 max-w-4xl px-6">
+        <div class="space-y-4">
+            <h1 class="text-6xl md:text-8xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                AI COMIC STUDIO
+            </h1>
+            <p class="text-xl text-gray-400 font-light tracking-widest uppercase">The Next Gen Storytelling Ecosystem</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-2xl mx-auto">
+            <!-- STUDIO PORTAL -->
+            <!-- Note: When deploying to Cloudflare, you might use subdomains like studio.yourdomain.com -->
+            <!-- For this setup, we assume /studio mapping if built as a subfolder, or replacing with absolute URL in production -->
+            <a href="/studio/" class="group relative bg-gray-900/50 border border-gray-800 hover:border-indigo-500 rounded-3xl p-8 transition-all hover:-translate-y-2 hover:shadow-[0_0_40px_rgba(99,102,241,0.3)] flex flex-col items-center">
+                <div class="w-16 h-16 bg-indigo-500/20 rounded-full flex items-center justify-center mb-4 text-indigo-400 group-hover:text-white group-hover:bg-indigo-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                </div>
+                <h3 class="text-2xl font-bold text-white mb-2">Creator Studio</h3>
+                <p class="text-sm text-gray-500 group-hover:text-gray-300">For Authors & Artists. Create comics with AI Agents.</p>
+            </a>
+
+            <!-- READER PORTAL -->
+            <a href="/reader/" class="group relative bg-gray-900/50 border border-gray-800 hover:border-pink-500 rounded-3xl p-8 transition-all hover:-translate-y-2 hover:shadow-[0_0_40px_rgba(236,72,153,0.3)] flex flex-col items-center">
+                <div class="w-16 h-16 bg-pink-500/20 rounded-full flex items-center justify-center mb-4 text-pink-400 group-hover:text-white group-hover:bg-pink-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                </div>
+                <h3 class="text-2xl font-bold text-white mb-2">Reader App</h3>
+                <p class="text-sm text-gray-500 group-hover:text-gray-300">For Fans. Read, Comment, and Support creators.</p>
+            </a>
+        </div>
+        
+        <div class="text-xs text-gray-600 mt-8">
+            <p>Admin Portal available at <a href="/admin/" class="underline hover:text-white">/admin</a> (Requires Authentication)</p>
+        </div>
+    </div>
+
+    <div class="absolute bottom-4 text-xs text-gray-600">
+        &copy; 2024 AI Comic Studio. Distributed Deployment.
+    </div>
   </body>
 </html>

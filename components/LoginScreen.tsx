@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 import { Logo } from './Logo';
 import { UserProfile } from '../types';
 import * as AuthService from '../services/authService';
-import { Loader2, ArrowRight, UserPlus, LogIn, Sparkles, Palette, BookOpen } from 'lucide-react';
+import { Loader2, ArrowRight, UserPlus, LogIn, Sparkles, Palette, BookOpen, Book } from 'lucide-react';
 
 interface LoginScreenProps {
     onLogin: (user: UserProfile) => void;
+    onEnterReader: () => void; // NEW PROP
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onEnterReader }) => {
     const [isRegistering, setIsRegistering] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -80,11 +81,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     <Logo className="w-12 h-12" />
                 </div>
 
+                {/* READER MODE BUTTON (TOP RIGHT) */}
+                <div className="absolute top-6 right-6">
+                    <button 
+                        onClick={onEnterReader}
+                        className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-sm border border-gray-200 dark:border-gray-700 group"
+                    >
+                        <Book className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform"/>
+                        Browse as Reader
+                    </button>
+                </div>
+
                 <div className="w-full max-w-md space-y-8">
                     <div className="text-center lg:text-left">
                         <h2 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center justify-center lg:justify-start gap-3">
                             {isRegistering ? <UserPlus className="w-8 h-8 text-indigo-600"/> : <LogIn className="w-8 h-8 text-indigo-600"/>}
-                            {isRegistering ? "Join the Studio" : "Welcome Back"}
+                            {isRegistering ? "Join the Studio" : "Creator Login"}
                         </h2>
                         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                             {isRegistering ? "Start your creative journey today." : "Log in to manage your projects and assets."}
