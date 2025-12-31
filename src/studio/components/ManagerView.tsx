@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ComicProject, WorkflowStage, ChapterArchive, AgentRole } from '../types';
 import { AGENTS } from '../constants';
-import { Settings, ArrowLeft, FileText, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Plus, Trash2, ArrowRight, RotateCcw, AlertTriangle, Zap, Star, Map, Edit, Eye, Lock, Lightbulb, Key, Calendar, Home, Briefcase, Users, BadgeCheck, Network } from 'lucide-react';
+import { Settings, ArrowLeft, FileText, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Plus, Trash2, ArrowRight, RotateCcw, AlertTriangle, Zap, Star, Map, Edit, Eye, Lock, Lightbulb, Key, Calendar, Home, Briefcase, Users, BadgeCheck, Network, AlertOctagon } from 'lucide-react';
 
 interface ManagerViewProps {
     project: ComicProject;
@@ -104,6 +104,8 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
     };
 
     const isProjectActive = !!project.storyFormat;
+    const activeSlotsUsed = activeProjects.length;
+    const slotsFull = activeSlotsUsed >= 3;
 
     const renderTabs = () => (
         <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700 pb-1 overflow-x-auto">
@@ -152,6 +154,10 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                     <div>
                        <div className="flex justify-between items-center mb-4">
                            <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2"><Briefcase className="w-5 h-5 text-indigo-600 dark:text-indigo-400"/> {t('ui.resume')}</h3>
+                           <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 border ${slotsFull ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' : 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800'}`}>
+                               {slotsFull && <AlertTriangle className="w-3 h-3"/>}
+                               Slots: {activeSlotsUsed}/3
+                           </div>
                        </div>
                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                            {[0, 1, 2].map(i => {
@@ -179,7 +185,12 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
 
                     {/* Start New Project */}
                     <div>
-                        <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2"><LayoutTemplate className="w-5 h-5 text-indigo-600 dark:text-indigo-400"/> {t('ui.start_new')}</h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2"><LayoutTemplate className="w-5 h-5 text-indigo-600 dark:text-indigo-400"/> {t('ui.start_new')}</h3>
+                            {slotsFull && (
+                                <span className="text-xs font-bold text-red-500 flex items-center gap-1"><AlertOctagon className="w-3 h-3"/> {t('manager.full_slots')}</span>
+                            )}
+                        </div>
                         
                         {project.originalScript && (
                             <div className="mb-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl flex items-center gap-3 animate-pulse">
@@ -192,21 +203,33 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                           <button onClick={() => { updateProject({ storyFormat: 'SHORT_STORY' }); setActiveTab('PIPELINE'); }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:shadow-xl transition-all text-left group relative overflow-hidden">
+                           <button 
+                                onClick={() => { updateProject({ storyFormat: 'SHORT_STORY' }); setActiveTab('PIPELINE'); }} 
+                                disabled={slotsFull}
+                                className={`bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all text-left group relative overflow-hidden ${slotsFull ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:border-indigo-500 dark:hover:border-indigo-400'}`}
+                           >
                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><BookOpen className="w-24 h-24 text-indigo-600 dark:text-indigo-400"/></div>
                                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl text-indigo-600 dark:text-indigo-400 w-fit mb-4 border border-indigo-100 dark:border-indigo-800"><BookOpen className="w-6 h-6"/></div>
                                <h4 className="font-bold text-lg text-gray-900 dark:text-gray-100 mb-2">{t('fmt.short')}</h4>
                                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{t('fmt.short.desc')}</p>
                            </button>
 
-                           <button onClick={() => { updateProject({ storyFormat: 'LONG_SERIES' }); setActiveTab('PIPELINE'); }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-400 hover:shadow-xl transition-all text-left group relative overflow-hidden">
+                           <button 
+                                onClick={() => { updateProject({ storyFormat: 'LONG_SERIES' }); setActiveTab('PIPELINE'); }} 
+                                disabled={slotsFull}
+                                className={`bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all text-left group relative overflow-hidden ${slotsFull ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:border-purple-500 dark:hover:border-purple-400'}`}
+                           >
                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><Library className="w-24 h-24 text-purple-600 dark:text-purple-400"/></div>
                                <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-xl text-purple-600 dark:text-purple-400 w-fit mb-4 border border-purple-100 dark:border-purple-800"><Library className="w-6 h-6"/></div>
                                <h4 className="font-bold text-lg text-gray-900 dark:text-gray-100 mb-2">{t('fmt.series')}</h4>
                                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{t('fmt.series.desc')}</p>
                            </button>
 
-                           <button onClick={() => { updateProject({ storyFormat: 'EPISODIC' }); setActiveTab('PIPELINE'); }} className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 dark:hover:border-emerald-400 hover:shadow-xl transition-all text-left group relative overflow-hidden">
+                           <button 
+                                onClick={() => { updateProject({ storyFormat: 'EPISODIC' }); setActiveTab('PIPELINE'); }} 
+                                disabled={slotsFull}
+                                className={`bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all text-left group relative overflow-hidden ${slotsFull ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:border-emerald-500 dark:hover:border-emerald-400'}`}
+                           >
                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><Smartphone className="w-24 h-24 text-emerald-600 dark:text-emerald-400"/></div>
                                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl text-emerald-600 dark:text-emerald-400 w-fit mb-4 border border-emerald-100 dark:border-emerald-800"><Smartphone className="w-6 h-6"/></div>
                                <h4 className="font-bold text-lg text-gray-900 dark:text-gray-100 mb-2">{t('fmt.episodic')}</h4>
@@ -223,10 +246,10 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                 <span className="font-bold text-sm text-gray-600 dark:text-gray-300 group-hover:text-indigo-700 dark:group-hover:text-indigo-300">{t('ui.import_script_btn')}</span>
                                 <input type="file" accept=".txt,.md" onChange={handleImportManuscript} className="hidden" />
                             </label>
-                            <label className="flex-1 bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl p-6 cursor-pointer transition-all flex flex-col items-center justify-center gap-2 text-center group">
+                            <label className={`flex-1 bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl p-6 cursor-pointer transition-all flex flex-col items-center justify-center gap-2 text-center group ${slotsFull ? 'opacity-50 pointer-events-none' : ''}`}>
                                 <Archive className="w-8 h-8 text-gray-400 dark:text-gray-500 group-hover:text-indigo-500 dark:group-hover:text-indigo-400"/>
                                 <span className="font-bold text-sm text-gray-600 dark:text-gray-300 group-hover:text-indigo-700 dark:group-hover:text-indigo-300">{t('ui.import_config_btn')}</span>
-                                <input type="file" accept=".zip" onChange={handleImportProjectZip} className="hidden" />
+                                <input type="file" accept=".zip" onChange={handleImportProjectZip} className="hidden" disabled={slotsFull} />
                             </label>
                         </div>
                     </div>
@@ -235,6 +258,7 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
         );
     }
     
+    // ... (rest of the file remains the same, reusing existing code blocks for PIPELINE, CHAPTERS, TEAM, SETTINGS)
     // --- VIEW: PIPELINE ---
     if (activeTab === 'PIPELINE') {
        return (
@@ -431,7 +455,6 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
 
     // --- VIEW: TEAM (Recruited Agents) ---
     if (activeTab === 'TEAM') {
-        // Group agents by department for the visualizer
         const departments: Record<string, AgentRole[]> = {
             'dept.strategy': [AgentRole.MARKET_RESEARCHER, AgentRole.CONTINUITY_EDITOR],
             'dept.writers': [AgentRole.SCRIPTWRITER, AgentRole.CENSOR, AgentRole.TRANSLATOR],

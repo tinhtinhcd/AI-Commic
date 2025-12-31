@@ -154,6 +154,29 @@ export const onRequest = async (context: any) => {
         const { project, isActive } = body;
         
         try {
+            // LIMIT CHECK: If saving an active project, check the count
+            if (isActive && project.ownerId) {
+                // 1. Check if this specific project already exists as active (Update vs Insert)
+                const existsRes = await client.query(
+                    'SELECT 1 FROM projects WHERE id = $1 AND is_active = TRUE', 
+                    [project.id]
+                );
+                const isUpdate = existsRes.rowCount > 0;
+
+                // 2. If it's NEW (not an update), check the total count
+                if (!isUpdate) {
+                    const countRes = await client.query(
+                        'SELECT COUNT(*) FROM projects WHERE owner_id = $1 AND is_active = TRUE',
+                        [project.ownerId]
+                    );
+                    const currentCount = parseInt(countRes.rows[0].count);
+                    
+                    if (currentCount >= 3) {
+                        return new Response(JSON.stringify({ error: "SLOTS_FULL", message: "Maximum 3 active projects allowed." }), { status: 403 });
+                    }
+                }
+            }
+
             await client.query(
                 `INSERT INTO projects (id, owner_id, title, is_active, data) 
                  VALUES ($1, $2, $3, $4, $5)

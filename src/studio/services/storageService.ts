@@ -24,17 +24,8 @@ export const saveWorkInProgress = async (project: ComicProject): Promise<{ succe
         if (!project.id) project.id = crypto.randomUUID();
         project.lastModified = Date.now();
 
-        // Check slot limit logic (Simple client side check based on current list, 
-        // essentially optimistic locking. Good enough for dev.)
-        if (!project.ownerId) {
-             // Legacy/Guest mode, maybe limit?
-        } else {
-             const existing = await getActiveProjects(project.ownerId);
-             const isNew = !existing.find(p => p.id === project.id);
-             if (isNew && existing.length >= 3) {
-                 return { success: false, message: "SLOTS_FULL" };
-             }
-        }
+        // Optimistic check: We assume client logic is sound, but server is authority.
+        // We'll let the server reject if it's full.
 
         const res = await fetch('/api/projects/save', {
             method: 'POST',
@@ -42,7 +33,13 @@ export const saveWorkInProgress = async (project: ComicProject): Promise<{ succe
             body: JSON.stringify({ project, isActive: true })
         });
 
-        if (!res.ok) throw new Error("API Error");
+        if (!res.ok) {
+            const errorData = await res.json();
+            if (res.status === 403 && errorData.error === "SLOTS_FULL") {
+                return { success: false, message: "SLOTS_FULL" };
+            }
+            throw new Error(errorData.error || "API Error");
+        }
         return { success: true };
     } catch (e: any) {
         return { success: false, message: e.message };
