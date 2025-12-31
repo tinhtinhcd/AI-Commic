@@ -2,13 +2,14 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import process from 'node:process'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   
   // DEFAULT TO READER if TARGET is not set
   const target = process.env.TARGET || 'reader';
-  const projectRoot = __dirname;
+  const projectRoot = process.cwd();
 
   let root = projectRoot;
   let outDir = resolve(projectRoot, 'dist');

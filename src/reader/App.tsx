@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { ComicProject } from '../types';
-import * as StorageService from '../services/storageService';
+import { ComicProject } from './types';
+import * as StorageService from './services/storageService';
 import { BookOpen, ChevronLeft, Heart, Share2, Search, X, Star, Layers } from 'lucide-react';
-import { Logo } from '../components/Logo';
+import { Logo } from './components/Logo';
 
 const ReaderApp: React.FC = () => {
     const [library, setLibrary] = useState<ComicProject[]>([]);
