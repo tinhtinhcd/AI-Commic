@@ -157,13 +157,14 @@ export const onRequest = async (context: any) => {
             // LIMIT CHECK: If saving an active project, check the count
             if (isActive && project.ownerId) {
                 // 1. Check if this specific project already exists as active (Update vs Insert)
+                // We check active status explicitly because reviving an archived project should also count towards limit
                 const existsRes = await client.query(
                     'SELECT 1 FROM projects WHERE id = $1 AND is_active = TRUE', 
                     [project.id]
                 );
                 const isUpdate = existsRes.rowCount > 0;
 
-                // 2. If it's NEW (not an update), check the total count
+                // 2. If it's NEW (not an update to an existing active project), check the total count
                 if (!isUpdate) {
                     const countRes = await client.query(
                         'SELECT COUNT(*) FROM projects WHERE owner_id = $1 AND is_active = TRUE',
