@@ -9,7 +9,8 @@ const SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        salt TEXT NOT NULL,
         data JSONB NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
@@ -27,8 +28,35 @@ const SCHEMA_SQL = `
     CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_id);
 `;
 
-interface Env {
-  DATABASE_URL: string;
+// --- SECURITY UTILS (PBKDF2) ---
+async function generateSalt() {
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPassword(password: string, salt: string) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+        "raw", 
+        enc.encode(password), 
+        { name: "PBKDF2" }, 
+        false, 
+        ["deriveBits"]
+    );
+    
+    const derivedBits = await crypto.subtle.deriveBits(
+        {
+            name: "PBKDF2",
+            salt: enc.encode(salt),
+            iterations: 100000,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        256
+    );
+    
+    return Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const onRequest = async (context: any) => {
@@ -38,8 +66,8 @@ export const onRequest = async (context: any) => {
 
   // Use env var if available, else fallback to hardcoded string
   const dbUrl = context.env.DATABASE_URL || CONNECTION_STRING;
-  // Use Client instead of Pool for serverless function scope
-  const client = new Client(dbUrl);
+  // Cast to any to avoid TypeScript errors if @types/pg is missing or incomplete in the environment
+  const client: any = new Client(dbUrl);
   await client.connect();
 
   // Helper to ensure DB is ready (Lazy Initialization)
@@ -66,8 +94,13 @@ export const onRequest = async (context: any) => {
           if (rows.length === 0) return new Response(JSON.stringify({ error: "User not found" }), { status: 404 });
           
           const user = rows[0];
-          // Simple password check for demo. Use bcrypt in production.
-          if (user.password !== password) return new Response(JSON.stringify({ error: "Invalid password" }), { status: 401 });
+          
+          // Secure Hash Verification
+          const inputHash = await hashPassword(password, user.salt);
+          
+          if (inputHash !== user.password_hash) {
+              return new Response(JSON.stringify({ error: "Invalid password" }), { status: 401 });
+          }
           
           return new Response(JSON.stringify(user.data), { headers: { 'Content-Type': 'application/json' } });
       } catch (e: any) {
@@ -84,17 +117,24 @@ export const onRequest = async (context: any) => {
       const { id, email, password, data } = body;
 
       try {
+        // Generate Salt & Hash
+        const salt = await generateSalt();
+        const hash = await hashPassword(password, salt);
+
         await client.query(
-            'INSERT INTO users (id, email, password, data) VALUES ($1, $2, $3, $4)',
-            [id, email, password, JSON.stringify(data)]
+            'INSERT INTO users (id, email, password_hash, salt, data) VALUES ($1, $2, $3, $4, $5)',
+            [id, email, hash, salt, JSON.stringify(data)]
         );
         return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
       } catch (e: any) {
         if (e.code === '42P01') {
             await ensureSchema();
+            // Retry once after schema creation
+            const salt = await generateSalt();
+            const hash = await hashPassword(password, salt);
             await client.query(
-                'INSERT INTO users (id, email, password, data) VALUES ($1, $2, $3, $4)',
-                [id, email, password, JSON.stringify(data)]
+                'INSERT INTO users (id, email, password_hash, salt, data) VALUES ($1, $2, $3, $4, $5)',
+                [id, email, hash, salt, JSON.stringify(data)]
             );
             return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
         }
@@ -105,7 +145,7 @@ export const onRequest = async (context: any) => {
       }
     }
 
-    // --- ADMIN ROUTES (NEW) ---
+    // --- ADMIN ROUTES ---
     
     if (path === 'admin/users' && method === 'GET') {
         try {
@@ -126,7 +166,7 @@ export const onRequest = async (context: any) => {
             const stats = {
                 totalUsers: parseInt(userCountRes.rows[0].count),
                 activeProjects: parseInt(projectCountRes.rows[0].count),
-                revenue: 0, // Placeholder for future logic
+                revenue: 0, // Placeholder
                 flaggedContent: 0 // Placeholder
             };
             return new Response(JSON.stringify(stats), { headers: { 'Content-Type': 'application/json' } });
@@ -150,7 +190,6 @@ export const onRequest = async (context: any) => {
         }
         
         if (type === 'active') {
-            // Logic: is_active = true
             query += ` AND is_active = TRUE`;
         }
 
@@ -170,7 +209,6 @@ export const onRequest = async (context: any) => {
     if (path === 'projects/save' && method === 'POST') {
         const body: any = await context.request.json();
         const { project, isActive } = body;
-        // Default isActive to true if undefined, but handle explicit false from Library saves
         const activeStatus = isActive !== undefined ? isActive : true;
         
         try {
