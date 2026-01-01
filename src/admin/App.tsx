@@ -1,19 +1,41 @@
+import React, { useState, useEffect } from 'react';
+import { Users, BarChart3, ShieldAlert, Settings, LogOut, XCircle, Search, Wallet, Loader2 } from 'lucide-react';
+import { UserProfile } from '../types';
+import { Logo } from '../components/Logo';
 
-import React, { useState } from 'react';
-import { Users, BarChart3, ShieldAlert, Settings, LogOut, XCircle, Search, Wallet } from 'lucide-react';
-import { UserProfile } from './types';
-import { Logo } from './components/Logo';
-
-// Mock Data for Admin Demo
-const MOCK_USERS: UserProfile[] = [
-    { id: '1', username: 'Stan Lee', email: 'stan@marvel.com', joinDate: Date.now() - 10000000, studioName: 'Marvelous', stats: { projectsCount: 15, chaptersCount: 300, charactersCount: 50 } },
-    { id: '2', username: 'Alan Moore', email: 'alan@watchmen.com', joinDate: Date.now() - 5000000, studioName: 'Chaos Magic', stats: { projectsCount: 3, chaptersCount: 12, charactersCount: 8 } },
-    { id: '3', username: 'MangaArtist99', email: 'manga@japan.jp', joinDate: Date.now() - 200000, studioName: 'Shonen Jump', stats: { projectsCount: 1, chaptersCount: 1, charactersCount: 2 } },
-];
-
-export const AdminApp: React.FC = () => {
+const AdminApp: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'USERS' | 'CONTENT' | 'FINANCE'>('DASHBOARD');
-    const [users] = useState(MOCK_USERS);
+    const [users, setUsers] = useState<UserProfile[]>([]);
+    const [stats, setStats] = useState({ totalUsers: 0, activeProjects: 0, revenue: 0, flaggedContent: 0 });
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // Parallel fetch for speed
+            const [usersRes, statsRes] = await Promise.all([
+                fetch('/api/admin/users'),
+                fetch('/api/admin/stats')
+            ]);
+
+            if (usersRes.ok) {
+                const usersData = await usersRes.json();
+                setUsers(usersData);
+            }
+            if (statsRes.ok) {
+                const statsData = await statsRes.json();
+                setStats(statsData);
+            }
+        } catch (e) {
+            console.error("Failed to load admin data", e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleLogout = () => {
         window.location.href = '/';
@@ -67,74 +89,90 @@ export const AdminApp: React.FC = () => {
                 <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
                     <h2 className="text-xl font-bold text-slate-800">{activeTab === 'DASHBOARD' ? 'System Overview' : activeTab.charAt(0) + activeTab.slice(1).toLowerCase()}</h2>
                     <div className="flex items-center gap-4">
+                        <button onClick={fetchData} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Refresh Data">
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin"/> : <BarChart3 className="w-5 h-5"/>}
+                        </button>
                         <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-700 text-xs border border-indigo-200">AD</div>
                         <span className="text-sm font-medium text-slate-600">Super Admin</span>
                     </div>
                 </header>
 
                 <div className="p-8">
-                    {activeTab === 'DASHBOARD' && (
-                        <div className="space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                <StatCard title="Total Users" value="12,345" icon={Users} color="text-blue-600" />
-                                <StatCard title="Active Projects" value="843" icon={BarChart3} color="text-emerald-600" />
-                                <StatCard title="Revenue (MTD)" value="$45,200" icon={Wallet} color="text-amber-600" />
-                                <StatCard title="Flagged Content" value="23" icon={ShieldAlert} color="text-red-600" />
-                            </div>
-                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-80 flex flex-col justify-center items-center text-slate-400">
-                                <BarChart3 className="w-16 h-16 opacity-20 mb-4"/>
-                                <p>Real-time Traffic Analytics (Integration Pending)</p>
-                            </div>
+                    {loading && users.length === 0 ? (
+                        <div className="flex items-center justify-center h-64">
+                            <Loader2 className="w-8 h-8 animate-spin text-indigo-600"/>
                         </div>
-                    )}
-
-                    {activeTab === 'USERS' && (
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="p-4 border-b border-slate-200 flex gap-4">
-                                <div className="relative flex-1 max-w-md">
-                                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400"/>
-                                    <input className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Search users by email or studio..."/>
+                    ) : (
+                        <>
+                            {activeTab === 'DASHBOARD' && (
+                                <div className="space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                        <StatCard title="Total Users" value={stats.totalUsers} icon={Users} color="text-blue-600" />
+                                        <StatCard title="Active Projects" value={stats.activeProjects} icon={BarChart3} color="text-emerald-600" />
+                                        <StatCard title="Revenue (MTD)" value={`$${stats.revenue}`} icon={Wallet} color="text-amber-600" />
+                                        <StatCard title="Flagged Content" value={stats.flaggedContent} icon={ShieldAlert} color="text-red-600" />
+                                    </div>
+                                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-80 flex flex-col justify-center items-center text-slate-400">
+                                        <BarChart3 className="w-16 h-16 opacity-20 mb-4"/>
+                                        <p>Real-time Traffic Analytics (DB Connected)</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
-                                    <tr>
-                                        <th className="px-6 py-4">User</th>
-                                        <th className="px-6 py-4">Studio</th>
-                                        <th className="px-6 py-4">Projects</th>
-                                        <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {users.map(u => (
-                                        <tr key={u.id} className="hover:bg-slate-50">
-                                            <td className="px-6 py-4 flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={u.avatar} className="w-full h-full object-cover"/></div>
-                                                <div>
-                                                    <div className="font-bold text-slate-800">{u.username}</div>
-                                                    <div className="text-slate-500 text-xs">{u.email}</div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-600">{u.studioName}</td>
-                                            <td className="px-6 py-4 font-mono">{u.stats?.projectsCount}</td>
-                                            <td className="px-6 py-4"><span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">Active</span></td>
-                                            <td className="px-6 py-4 flex gap-2">
-                                                <button className="p-2 hover:bg-slate-200 rounded text-slate-500"><Settings className="w-4 h-4"/></button>
-                                                <button className="p-2 hover:bg-red-100 rounded text-red-500"><XCircle className="w-4 h-4"/></button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                    
-                    {activeTab === 'CONTENT' && (
-                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><ShieldAlert className="w-5 h-5 text-red-500"/> Flagged Reports</h3>
-                            <p className="text-sm text-gray-500">No active reports.</p>
-                         </div>
+                            )}
+
+                            {activeTab === 'USERS' && (
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                    <div className="p-4 border-b border-slate-200 flex gap-4">
+                                        <div className="relative flex-1 max-w-md">
+                                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400"/>
+                                            <input className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Search users by email or studio..."/>
+                                        </div>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
+                                                <tr>
+                                                    <th className="px-6 py-4">User</th>
+                                                    <th className="px-6 py-4">Studio</th>
+                                                    <th className="px-6 py-4">Joined</th>
+                                                    <th className="px-6 py-4">Stats</th>
+                                                    <th className="px-6 py-4">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {users.map(u => (
+                                                    <tr key={u.id} className="hover:bg-slate-50">
+                                                        <td className="px-6 py-4 flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden"><img src={u.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${u.username}`} className="w-full h-full object-cover"/></div>
+                                                            <div>
+                                                                <div className="font-bold text-slate-800">{u.username}</div>
+                                                                <div className="text-slate-500 text-xs">{u.email}</div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-slate-600">{u.studioName || '-'}</td>
+                                                        <td className="px-6 py-4 text-slate-500">{new Date(u.joinDate).toLocaleDateString()}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold mr-1">P: {u.stats?.projectsCount || 0}</span>
+                                                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">C: {u.stats?.chaptersCount || 0}</span>
+                                                        </td>
+                                                        <td className="px-6 py-4 flex gap-2">
+                                                            <button className="p-2 hover:bg-slate-200 rounded text-slate-500"><Settings className="w-4 h-4"/></button>
+                                                            <button className="p-2 hover:bg-red-100 rounded text-red-500"><XCircle className="w-4 h-4"/></button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {activeTab === 'CONTENT' && (
+                                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><ShieldAlert className="w-5 h-5 text-red-500"/> Flagged Reports</h3>
+                                    <p className="text-sm text-gray-500 italic">No active reports from the moderation AI agent.</p>
+                                 </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

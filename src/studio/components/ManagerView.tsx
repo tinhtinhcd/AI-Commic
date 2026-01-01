@@ -1,10 +1,9 @@
 
 /// <reference lib="dom" />
-import React, { useState, useEffect } from 'react';
-import { ComicProject, WorkflowStage, ChapterArchive, AgentRole } from '../types';
+import React, { useState } from 'react';
+import { ComicProject, WorkflowStage, AgentRole } from '../types';
 import { AGENTS } from '../constants';
-import { Settings, ArrowLeft, FileText, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Plus, Trash2, ArrowRight, RotateCcw, AlertTriangle, Zap, Star, Map, Edit, Eye, Lock, Lightbulb, Key, Calendar, Home, Briefcase, Users, BadgeCheck, Network, AlertOctagon, BrainCircuit } from 'lucide-react';
-import * as AuthService from '../services/authService';
+import { Settings, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Trash2, ArrowRight, RotateCcw, Map, Edit, Eye, Lock, Lightbulb, Home, Briefcase, BrainCircuit, FileText } from 'lucide-react';
 
 interface ManagerViewProps {
     project: ComicProject;
@@ -375,14 +374,12 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                     <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm flex-1 overflow-y-auto">
                         <div className="space-y-8 max-w-2xl">
                             
-                            {/* MODEL ENGINE SELECTION (PROJECT SCOPE) */}
                             <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                                     <BrainCircuit className="w-5 h-5 text-purple-600"/> AI Engine Configuration
                                 </h3>
                                 
                                 <div className="space-y-4">
-                                    {/* Text Engine Switch */}
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">{t('manager.text_engine')}</label>
                                         <div className="flex gap-2">

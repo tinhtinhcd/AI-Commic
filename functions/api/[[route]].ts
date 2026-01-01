@@ -1,3 +1,4 @@
+
 import { Client } from '@neondatabase/serverless';
 
 // Hardcoded for Dev Convenience. In Prod, set this in Cloudflare Pages Settings.
@@ -49,7 +50,6 @@ export const onRequest = async (context: any) => {
 
   try {
     // --- SYSTEM ROUTES ---
-    // Explicit initialization endpoint (optional, but good for diagnostics)
     if (path === 'system/init' && method === 'GET') {
         await ensureSchema();
         return new Response(JSON.stringify({ status: "Database initialized successfully" }), { headers: { 'Content-Type': 'application/json' } });
@@ -66,13 +66,13 @@ export const onRequest = async (context: any) => {
           if (rows.length === 0) return new Response(JSON.stringify({ error: "User not found" }), { status: 404 });
           
           const user = rows[0];
+          // Simple password check for demo. Use bcrypt in production.
           if (user.password !== password) return new Response(JSON.stringify({ error: "Invalid password" }), { status: 401 });
           
           return new Response(JSON.stringify(user.data), { headers: { 'Content-Type': 'application/json' } });
       } catch (e: any) {
-          // If table doesn't exist, we can't login anyway, but let's give a clear error
-          if (e.code === '42P01') { // undefined_table
-              await ensureSchema(); // Auto-fix for next time
+          if (e.code === '42P01') { 
+              await ensureSchema();
               return new Response(JSON.stringify({ error: "System initialized. Please try again." }), { status: 503 });
           }
           throw e;
@@ -84,37 +84,55 @@ export const onRequest = async (context: any) => {
       const { id, email, password, data } = body;
 
       try {
-        // Optimistic: Try insert
         await client.query(
             'INSERT INTO users (id, email, password, data) VALUES ($1, $2, $3, $4)',
             [id, email, password, JSON.stringify(data)]
         );
         return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
       } catch (e: any) {
-        // Self-Healing: If table missing (Error 42P01), create it and retry
         if (e.code === '42P01') {
             await ensureSchema();
-            // Retry the insert once
             await client.query(
                 'INSERT INTO users (id, email, password, data) VALUES ($1, $2, $3, $4)',
                 [id, email, password, JSON.stringify(data)]
             );
             return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
         }
-        
-        if (e.code === '23505') { // Unique violation
+        if (e.code === '23505') {
              return new Response(JSON.stringify({ error: "Email already exists" }), { status: 400 });
         }
-        
         throw e;
       }
     }
 
-    if (path === 'auth/update' && method === 'POST') {
-        const body: any = await context.request.json();
-        const { id, data } = body;
-        await client.query('UPDATE users SET data = $1 WHERE id = $2', [JSON.stringify(data), id]);
-        return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
+    // --- ADMIN ROUTES (NEW) ---
+    
+    if (path === 'admin/users' && method === 'GET') {
+        try {
+            const { rows } = await client.query('SELECT data FROM users ORDER BY created_at DESC LIMIT 100');
+            const users = rows.map(r => r.data);
+            return new Response(JSON.stringify(users), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e: any) {
+            if (e.code === '42P01') return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } });
+            throw e;
+        }
+    }
+
+    if (path === 'admin/stats' && method === 'GET') {
+        try {
+            const userCountRes = await client.query('SELECT COUNT(*) FROM users');
+            const projectCountRes = await client.query('SELECT COUNT(*) FROM projects WHERE is_active = TRUE');
+            
+            const stats = {
+                totalUsers: parseInt(userCountRes.rows[0].count),
+                activeProjects: parseInt(projectCountRes.rows[0].count),
+                revenue: 0, // Placeholder for future logic
+                flaggedContent: 0 // Placeholder
+            };
+            return new Response(JSON.stringify(stats), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e: any) {
+            return new Response(JSON.stringify({ totalUsers: 0, activeProjects: 0 }), { headers: { 'Content-Type': 'application/json' } });
+        }
     }
 
     // --- PROJECT ROUTES ---
@@ -131,9 +149,9 @@ export const onRequest = async (context: any) => {
             query += ` AND owner_id = $${params.length}`;
         }
         
-        if (type) {
-            params.push(type === 'active');
-            query += ` AND is_active = $${params.length}`;
+        if (type === 'active') {
+            // Logic: is_active = true
+            query += ` AND is_active = TRUE`;
         }
 
         try {
@@ -152,19 +170,17 @@ export const onRequest = async (context: any) => {
     if (path === 'projects/save' && method === 'POST') {
         const body: any = await context.request.json();
         const { project, isActive } = body;
+        // Default isActive to true if undefined, but handle explicit false from Library saves
+        const activeStatus = isActive !== undefined ? isActive : true;
         
         try {
-            // LIMIT CHECK: If saving an active project, check the count
-            if (isActive && project.ownerId) {
-                // 1. Check if this specific project already exists as active (Update vs Insert)
-                // We check active status explicitly because reviving an archived project should also count towards limit
+            if (activeStatus && project.ownerId) {
                 const existsRes = await client.query(
                     'SELECT 1 FROM projects WHERE id = $1 AND is_active = TRUE', 
                     [project.id]
                 );
                 const isUpdate = existsRes.rowCount > 0;
 
-                // 2. If it's NEW (not an update to an existing active project), check the total count
                 if (!isUpdate) {
                     const countRes = await client.query(
                         'SELECT COUNT(*) FROM projects WHERE owner_id = $1 AND is_active = TRUE',
@@ -183,19 +199,18 @@ export const onRequest = async (context: any) => {
                  VALUES ($1, $2, $3, $4, $5)
                  ON CONFLICT (id) DO UPDATE 
                  SET title = EXCLUDED.title, is_active = EXCLUDED.is_active, data = EXCLUDED.data, updated_at = NOW()`,
-                [project.id, project.ownerId, project.title, isActive, JSON.stringify(project)]
+                [project.id, project.ownerId, project.title, activeStatus, JSON.stringify(project)]
             );
             return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
         } catch (e: any) {
             if (e.code === '42P01') {
                 await ensureSchema();
-                // Retry
                 await client.query(
                     `INSERT INTO projects (id, owner_id, title, is_active, data) 
                      VALUES ($1, $2, $3, $4, $5)
                      ON CONFLICT (id) DO UPDATE 
                      SET title = EXCLUDED.title, is_active = EXCLUDED.is_active, data = EXCLUDED.data, updated_at = NOW()`,
-                    [project.id, project.ownerId, project.title, isActive, JSON.stringify(project)]
+                    [project.id, project.ownerId, project.title, activeStatus, JSON.stringify(project)]
                 );
                 return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
             }
@@ -215,7 +230,6 @@ export const onRequest = async (context: any) => {
     console.error("API Error:", error);
     return new Response(JSON.stringify({ error: error.message, code: error.code }), { status: 500 });
   } finally {
-    // Ensure connection is closed
     context.waitUntil(client.end());
   }
 };

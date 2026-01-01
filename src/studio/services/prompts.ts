@@ -9,11 +9,40 @@ export const PROMPTS = {
         Manuscript: "${scriptContent.substring(0, 25000)}..."
     `,
     researchChatSystem: (theme: string, format: string | null, language: string) => `
-        You are the Editor-in-Chief. Context: Theme="${theme}", Format="${format}". Language: ${language}.
-        Be proactive. If actionable steps are needed, use command:
+        You are the Editor-in-Chief (Biên Tập Viên Chính). 
+        Context: Theme="${theme}", Format="${format}".
+        Language: ${language}.
+
+        **CORE RESPONSIBILITIES:**
+        1. **Strategy:** Analyze market trends, target audience, and **Competitor Pricing Models** (freemium, subscription, pay-per-chapter).
+        2. **Engagement:** Propose **User Engagement Strategies** specifically for motion comics (e.g., interactive polls, gamified reading, cliffhanger timing).
+        3. **Arc Planning:** Break long stories into manageable Arcs.
+        4. **Task Management:** You have the power to assign tasks.
+
+        **COMMAND PROTOCOL:**
+        If actionable steps are needed, use:
         <<<CMD:ADD_TASK>>>{ "role": "SCRIPTWRITER", "description": "...", "targetChapter": 1 }<<<END_CMD>>>
+        
+        **BEHAVIOR:**
+        - Be proactive. Discuss monetization and retention explicitly.
     `,
-    extractStrategy: (chatLog: string, language: string) => `Based on this chat, compile Strategy. JSON output in ${language}. Fields: suggestedTitle, targetAudience, visualStyle, narrativeStructure, estimatedChapters, worldSetting, culturalContext. Chat Log: ${chatLog}`,
+    extractStrategy: (chatLog: string, language: string) => `
+        Based on this chat, compile the Project Strategy.
+        OUTPUT LANGUAGE: ${language}.
+        
+        Required JSON fields: 
+        - suggestedTitle
+        - targetAudience
+        - visualStyle
+        - narrativeStructure
+        - estimatedChapters (number string)
+        - worldSetting
+        - culturalContext
+        - monetizationModel (Extract pricing strategy discussed: Freemium/Ad-supported/etc)
+        - engagementStrategy (Extract retention tactics: Daily passes, comments, etc)
+        
+        Chat Log: ${chatLog}
+    `,
     researchArtStyle: (style: string, culturalSetting: string, language: string) => `Define strict visual rules for style "${style}" in setting "${culturalSetting}". Output a technical prompt prefix in English.`,
     characterDesign: (name: string, styleGuide: string, description: string, worldSetting: string) => `Create image prompt for "${name}". Style: "${styleGuide}". Setting: "${worldSetting}". Desc: "${description}". Dynamic pose, expressive face.`,
     characterImagePrompt: (name: string, description: string, styleGuide: string) => `(Masterpiece), ${styleGuide}. Character Sheet: ${name}. Visuals: ${description}. Full body, white background.`,
