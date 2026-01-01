@@ -141,6 +141,8 @@ export interface SystemLog {
   type: 'info' | 'success' | 'error' | 'warning';
 }
 
+export type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+
 export interface AgentTask {
     id: string;
     role: AgentRole;
@@ -149,6 +151,8 @@ export interface AgentTask {
     createdAt: number;
     type: 'USER' | 'SYSTEM';
     targetChapter?: number;
+    priority?: TaskPriority;
+    deadline?: number; // Timestamp
 }
 
 export interface ResearchData {

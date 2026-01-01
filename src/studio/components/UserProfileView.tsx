@@ -37,7 +37,6 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdate
                     openai: openAIKeyInput
                 }
             });
-            // No need to save to localStorage anymore, backend handles it.
             onUpdate(updated);
             setIsEditing(false);
             (window as any).alert("Profile & AI Keys Saved to Database!");

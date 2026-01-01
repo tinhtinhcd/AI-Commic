@@ -1,3 +1,4 @@
+
 /// <reference lib="dom" />
 import React, { useState, useEffect } from 'react';
 import { ComicProject, AgentRole, SystemLog } from '../types';
@@ -13,6 +14,7 @@ export const useProjectManagement = (
     const [saveStatus, setSaveStatus] = useState<'IDLE' | 'SAVING' | 'SAVED' | 'ERROR'>('IDLE');
     const [activeProjects, setActiveProjects] = useState<ComicProject[]>([]);
     const [library, setLibrary] = useState<ComicProject[]>([]);
+    const [isProjectLoading, setIsProjectLoading] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -65,10 +67,17 @@ export const useProjectManagement = (
         }
     };
 
-    const handleLoadWIP = (p: ComicProject) => {
+    const handleLoadWIP = async (p: ComicProject) => {
         if ((window as any).confirm("Load this project? Unsaved changes in current workspace will be lost.")) {
-            updateProject(p);
-            addLog(AgentRole.PROJECT_MANAGER, `Loaded Workspace: ${p.title}`, 'info');
+            setIsProjectLoading(true);
+            try {
+                // Artificial delay for visual feedback
+                await new Promise(resolve => setTimeout(resolve, 800));
+                updateProject(p);
+                addLog(AgentRole.PROJECT_MANAGER, `Loaded Workspace: ${p.title}`, 'info');
+            } finally {
+                setIsProjectLoading(false);
+            }
         }
     };
 
@@ -109,13 +118,32 @@ export const useProjectManagement = (
     const handleImportProjectZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = (e.target as any).files?.[0];
         if (!file) return;
+        
+        setIsProjectLoading(true);
+        addLog(AgentRole.PROJECT_MANAGER, "Unzipping and restoring project...", 'info');
+        
         try {
             const loadedProject = await StorageService.importProjectFromZip(file);
+            // Simulate processing time
+            await new Promise(resolve => setTimeout(resolve, 600));
+            
+            const saveResult = await StorageService.saveWorkInProgress(loadedProject);
+            if (!saveResult.success && saveResult.message === 'SLOTS_FULL') {
+                 if(!(window as any).confirm("Slots full. Load temporarily without saving?")) {
+                     throw new Error("Cancelled by user");
+                 }
+            }
+
             updateProject(loadedProject);
             await refreshLists();
             addLog(AgentRole.PROJECT_MANAGER, "Project restored.", 'success');
         } catch (e: any) {
-            (window as any).alert("Import failed: " + e.message);
+            if (e.message !== "Cancelled by user") {
+                (window as any).alert("Import failed: " + e.message);
+            }
+        } finally {
+            setIsProjectLoading(false);
+            e.target.value = ''; // Reset
         }
     };
 
@@ -153,7 +181,9 @@ export const useProjectManagement = (
     };
 
     return {
-        saveStatus, activeProjects, library, handleSaveWIP, handleLoadWIP, handleDeleteWIP,
-        handleDeleteFromLibrary, handleExportProjectZip, handleImportProjectZip, switchProjectLanguage, handleAddLanguage, addLog
+        saveStatus, activeProjects, library, isProjectLoading,
+        handleSaveWIP, handleLoadWIP, handleDeleteWIP,
+        handleDeleteFromLibrary, handleExportProjectZip, handleImportProjectZip, switchProjectLanguage, handleAddLanguage, addLog,
+        setProjectLoading: setIsProjectLoading
     };
 };
