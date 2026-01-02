@@ -61,28 +61,32 @@ export const onRequest = async (context: any) => {
   const method = context.request.method;
   const path = url.pathname.replace('/api/', ''); 
 
-  // Use env var if available. REMOVED INVALID HARDCODED STRING.
+  // Safely get DB URL
   const dbUrl = context.env.DATABASE_URL;
   
-  if (!dbUrl) {
-      // If no DB is configured, return error or handle gracefully for static serving
+  // If no DB configured, return 503 immediately
+  if (!dbUrl || dbUrl.trim() === '') {
       return new Response(JSON.stringify({ error: "Database not configured" }), { status: 503 });
   }
 
-  // Cast to any to avoid TypeScript errors if @types/pg is missing or incomplete in the environment
+  // Cast to any to avoid TypeScript errors
   const client: any = new Client(dbUrl);
   
   try {
       await client.connect();
   } catch (dbErr: any) {
       console.error("DB Connection Failed:", dbErr);
+      // Return 503 so frontend falls back to local storage
       return new Response(JSON.stringify({ error: "Database Connection Failed", details: dbErr.message }), { status: 503 });
   }
 
   // Helper to ensure DB is ready (Lazy Initialization)
   const ensureSchema = async () => {
-      console.log("Checking DB Schema...");
-      await client.query(SCHEMA_SQL);
+      try {
+          await client.query(SCHEMA_SQL);
+      } catch (e) {
+          console.error("Schema Init Failed", e);
+      }
   };
 
   try {
@@ -113,7 +117,7 @@ export const onRequest = async (context: any) => {
           
           return new Response(JSON.stringify(user.data), { headers: { 'Content-Type': 'application/json' } });
       } catch (e: any) {
-          if (e.code === '42P01') { 
+          if (e.code === '42P01') { // Undefined table
               await ensureSchema();
               return new Response(JSON.stringify({ error: "System initialized. Please try again." }), { status: 503 });
           }
