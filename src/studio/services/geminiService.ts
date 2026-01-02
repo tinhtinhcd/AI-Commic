@@ -5,21 +5,22 @@ import { PROMPTS } from "./prompts";
 import { getCurrentUser } from "./authService";
 import { DEFAULT_USER_PREFERENCES } from "../constants";
 
-// --- API HELPERS (SYNCED WITH USER PROFILE) ---
+// --- API HELPERS (LOCAL STORAGE PRIORITY) ---
 
-export const getDynamicApiKey = (): string => {
-    // 1. Try User Profile (Cloud Sync / Session)
-    const user = getCurrentUser();
-    if (user && user.apiKeys?.gemini) {
-        return user.apiKeys.gemini.trim();
-    }
+interface StoredKey {
+    id: string;
+    key: string;
+    provider?: 'GEMINI' | 'DEEPSEEK' | 'OPENAI';
+    isActive: boolean;
+}
 
-    // 2. Legacy LocalStorage fallback (Keystore V2 - from Settings tab)
+const getLocalKey = (provider: 'GEMINI' | 'DEEPSEEK' | 'OPENAI'): string | undefined => {
     try {
         const rawStore = localStorage.getItem('ai_comic_keystore_v2');
         if (rawStore) {
-            const keys: any[] = JSON.parse(rawStore);
-            const activeKey = keys.find((k: any) => k.isActive);
+            const keys: StoredKey[] = JSON.parse(rawStore);
+            // Legacy keys might not have 'provider', assume GEMINI
+            const activeKey = keys.find(k => k.isActive && (k.provider === provider || (!k.provider && provider === 'GEMINI')));
             if (activeKey && activeKey.key.trim().length > 0) {
                 return activeKey.key.trim();
             }
@@ -27,28 +28,47 @@ export const getDynamicApiKey = (): string => {
     } catch (e) {
         console.error("Error reading API key store", e);
     }
+    return undefined;
+};
+
+export const getDynamicApiKey = (): string => {
+    // 1. LocalStorage (Privacy / Override)
+    const localKey = getLocalKey('GEMINI');
+    if (localKey) return localKey;
+
+    // 2. User Profile (Cloud Sync)
+    const user = getCurrentUser();
+    if (user && user.apiKeys?.gemini) {
+        return user.apiKeys.gemini.trim();
+    }
     
-    // 3. Environment Variable fallback (Build time injection)
-    // Note: On Cloudflare, this must be set during build time, not just runtime.
+    // 3. Environment Variable fallback
     const envKey = process.env.API_KEY;
-    if (envKey && envKey.length > 0 && !envKey.startsWith('%')) { // Avoid unreplaced vite env vars
+    if (envKey && envKey.length > 0 && !envKey.startsWith('%')) { 
         return envKey;
     }
 
-    console.warn("No API Key found in User Profile, LocalStorage, or Environment Variables.");
-    return '';
+    return ''; 
 };
 
 const getDeepSeekKey = (): string => {
+    const localKey = getLocalKey('DEEPSEEK');
+    if (localKey) return localKey;
+
     const user = getCurrentUser();
     if (user && user.apiKeys?.deepseek) return user.apiKeys.deepseek.trim();
-    return localStorage.getItem('ai_comic_deepseek_key') || '';
+
+    return '';
 };
 
 const getOpenAIKey = (): string => {
+    const localKey = getLocalKey('OPENAI');
+    if (localKey) return localKey;
+
     const user = getCurrentUser();
     if (user && user.apiKeys?.openai) return user.apiKeys.openai.trim();
-    return localStorage.getItem('ai_comic_openai_key') || '';
+
+    return '';
 };
 
 const getAI = () => {
@@ -228,8 +248,6 @@ export const generateScript = async (theme: string, style: string, language: str
     const result = cleanAndParseJSON(text); return { title: result.title, panels: result.panels.map((p: any) => ({ ...p, id: crypto.randomUUID(), dialogue: p.dialogue || '', charactersInvolved: p.charactersInvolved || [] })) };
 };
 
-// --- UPDATED IMAGE GENERATION FUNCTIONS WITH LOGGING ---
-
 export const generateCharacterDesign = async (name: string, styleGuide: string, description: string, worldSetting: string, tier: 'STANDARD' | 'PREMIUM', imageModel: string = 'gemini-2.5-flash-image', referenceImage?: string): Promise<{ description: string, imageUrl: string }> => {
     const ai = getAI();
     // 1. Refine description using text model
@@ -259,7 +277,6 @@ export const generateCharacterDesign = async (name: string, styleGuide: string, 
                 if (part.inlineData) { 
                     imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`; 
                 } else if (part.text) {
-                    // Capture text fallback (often refusal messages)
                     failureReason += part.text;
                 }
             } 

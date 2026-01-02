@@ -1,9 +1,9 @@
 
 /// <reference lib="dom" />
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ComicProject, WorkflowStage, AgentRole } from '../types';
 import { AGENTS } from '../constants';
-import { Settings, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Trash2, ArrowRight, RotateCcw, Map, Edit, Eye, Lock, Lightbulb, Home, Briefcase, BrainCircuit, FileText, Globe, X, Plus, Languages, Sliders, Hash } from 'lucide-react';
+import { Settings, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Trash2, ArrowRight, RotateCcw, Map, Edit, Eye, Lock, Lightbulb, Home, Briefcase, BrainCircuit, FileText, Globe, X, Plus, Languages, Sliders, Hash, Key, Calendar } from 'lucide-react';
 
 interface ManagerViewProps {
     project: ComicProject;
@@ -29,6 +29,14 @@ interface ManagerViewProps {
     supportedLanguages: string[];
 }
 
+interface StoredKey {
+    id: string;
+    key: string;
+    provider: 'GEMINI' | 'DEEPSEEK' | 'OPENAI';
+    timestamp: number;
+    isActive: boolean;
+}
+
 export const ManagerView: React.FC<ManagerViewProps> = ({ 
     project, activeProjects, updateProject, handleLoadWIP, handleDeleteWIP, 
     handleStartResearch, handleApproveResearchAndScript, handleApproveScriptAndVisualize, handleFinalizeProduction,
@@ -41,6 +49,80 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
         project.storyFormat ? 'PIPELINE' : 'LOBBY'
     );
     const [selectedChapterId, setSelectedChapterId] = useState<number>(project.currentChapter || 1);
+    
+    // API KEY MANAGEMENT STATE
+    const [apiKeyInput, setApiKeyInput] = useState('');
+    const [selectedProvider, setSelectedProvider] = useState<'GEMINI' | 'DEEPSEEK' | 'OPENAI'>('GEMINI');
+    const [storedKeys, setStoredKeys] = useState<StoredKey[]>([]);
+
+    useEffect(() => {
+        loadKeys();
+    }, []);
+
+    const loadKeys = () => {
+        try {
+            const raw = localStorage.getItem('ai_comic_keystore_v2');
+            if (raw) {
+                const parsed: any[] = JSON.parse(raw);
+                // Migration: If provider is missing, assume GEMINI
+                const migrated: StoredKey[] = parsed.map(k => ({
+                    ...k,
+                    provider: k.provider || 'GEMINI'
+                }));
+                setStoredKeys(migrated.sort((a, b) => b.timestamp - a.timestamp));
+            }
+        } catch (e) {
+            console.error("Failed to load keys", e);
+        }
+    };
+
+    const handleAddKey = () => {
+        if (!apiKeyInput.trim()) return;
+        
+        // Deactivate other keys of the same provider
+        const newKeys = storedKeys.map(k => ({
+            ...k, 
+            isActive: k.provider === selectedProvider ? false : k.isActive
+        })); 
+        
+        const newKeyEntry: StoredKey = {
+            id: crypto.randomUUID(),
+            key: apiKeyInput.trim(),
+            provider: selectedProvider,
+            timestamp: Date.now(),
+            isActive: true 
+        };
+        
+        const updated = [newKeyEntry, ...newKeys];
+        localStorage.setItem('ai_comic_keystore_v2', JSON.stringify(updated));
+        setStoredKeys(updated);
+        setApiKeyInput('');
+        (window as any).alert(`New ${selectedProvider} API Key added and set as Active.`);
+    };
+
+    const handleSelectKey = (id: string, provider: string) => {
+        const updated = storedKeys.map(k => ({ 
+            ...k, 
+            isActive: k.id === id ? true : (k.provider === provider ? false : k.isActive)
+        }));
+        localStorage.setItem('ai_comic_keystore_v2', JSON.stringify(updated));
+        setStoredKeys(updated);
+    };
+
+    const handleDeleteKey = (id: string) => {
+        if(!(window as any).confirm("Delete this API Key?")) return;
+        let updated = storedKeys.filter(k => k.id !== id);
+        
+        // If we deleted an active key, try to activate another one of the same provider
+        const deletedKey = storedKeys.find(k => k.id === id);
+        if (deletedKey?.isActive) {
+            const nextKey = updated.find(k => k.provider === deletedKey.provider);
+            if (nextKey) nextKey.isActive = true;
+        }
+        
+        localStorage.setItem('ai_comic_keystore_v2', JSON.stringify(updated));
+        setStoredKeys(updated);
+    };
     
     const updateTextEngine = (engine: 'GEMINI' | 'DEEPSEEK' | 'OPENAI') => {
         updateProject({ textEngine: engine });
@@ -521,7 +603,80 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                 </div>
                             </div>
 
-                            {/* SECTION 3: AI CONFIG */}
+                            {/* SECTION 3: API KEY CONFIG (UPDATED) */}
+                            <div className="bg-blue-50 dark:bg-blue-900/10 p-5 rounded-xl border border-blue-100 dark:border-blue-900">
+                                <label className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-2 block flex items-center gap-2">
+                                    <Key className="w-4 h-4"/> External API Key Management (Local Storage)
+                                </label>
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                                    Add your personal API keys here for direct access. Keys are stored locally on your device.
+                                </p>
+                                
+                                {/* ADD NEW KEY UI */}
+                                <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                                    <select
+                                        value={selectedProvider}
+                                        onChange={(e) => setSelectedProvider(e.target.value as any)}
+                                        className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500 w-full sm:w-32"
+                                    >
+                                        <option value="GEMINI">Gemini</option>
+                                        <option value="DEEPSEEK">DeepSeek</option>
+                                        <option value="OPENAI">OpenAI</option>
+                                    </select>
+                                    
+                                    <div className="relative flex-1">
+                                        <input 
+                                            type="password"
+                                            value={apiKeyInput}
+                                            onChange={(e) => setApiKeyInput((e.target as HTMLInputElement).value)}
+                                            placeholder={`Paste ${selectedProvider} API Key...`}
+                                            className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <button onClick={handleAddKey} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 sm:w-auto w-full">
+                                        <Plus className="w-3 h-3"/> Add Key
+                                    </button>
+                                </div>
+
+                                {/* KEY LIST */}
+                                {storedKeys.length > 0 ? (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                                        {storedKeys.map((k) => (
+                                            <div key={k.id} className={`flex items-center justify-between p-2 rounded-lg border text-xs ${k.isActive ? 'bg-white dark:bg-gray-800 border-blue-400 dark:border-blue-500 shadow-sm' : 'bg-gray-100 dark:bg-gray-900/50 border-transparent text-gray-500'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <input 
+                                                        type="radio" 
+                                                        name={`activeKey_${k.provider}`} 
+                                                        checked={k.isActive} 
+                                                        onChange={() => handleSelectKey(k.id, k.provider)}
+                                                        className="cursor-pointer"
+                                                    />
+                                                    <div>
+                                                        <p className="font-bold flex items-center gap-2">
+                                                            <span className={`px-1.5 py-0.5 rounded text-[10px] ${k.provider === 'GEMINI' ? 'bg-blue-100 text-blue-700' : k.provider === 'DEEPSEEK' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>{k.provider}</span>
+                                                            {k.isActive ? <span className="text-blue-600 dark:text-blue-400">Active</span> : "Stored"}
+                                                            {k.isActive && <CheckCircle className="w-3 h-3 text-blue-500"/>}
+                                                        </p>
+                                                        <p className="text-[10px] opacity-70 flex items-center gap-1 mt-0.5">
+                                                            <Calendar className="w-3 h-3"/>
+                                                            {new Date(k.timestamp).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => handleDeleteKey(k.id)} className="text-gray-400 hover:text-red-500 p-1">
+                                                    <Trash2 className="w-4 h-4"/>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-4 bg-white/50 dark:bg-gray-900/30 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
+                                        <p className="text-xs text-gray-400">No custom keys added.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* SECTION 4: AI CONFIG */}
                             <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-xl border border-gray-200 dark:border-gray-700">
                                 <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                                     <BrainCircuit className="w-5 h-5 text-purple-600"/> AI Engine Configuration
@@ -564,7 +719,7 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                 </div>
                             </div>
                             
-                            {/* SECTION 4: ACTIONS */}
+                            {/* SECTION 5: ACTIONS */}
                             <div className="border-t border-gray-100 dark:border-gray-700 pt-6 mt-2 flex flex-col gap-3">
                                 <button onClick={handleExportProjectZip} className="w-full flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold py-3 px-6 rounded-xl transition-colors border border-gray-200 dark:border-gray-600">
                                     <Archive className="w-4 h-4"/> {t('ui.export_zip_btn')}
