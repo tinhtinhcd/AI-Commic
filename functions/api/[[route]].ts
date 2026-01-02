@@ -158,6 +158,33 @@ export const onRequest = async (context: any) => {
         }
     }
 
+    if (path === 'admin/user/update' && method === 'POST') {
+        const body = await context.request.json();
+        const { id, updates } = body;
+        
+        // Fetch current data first to merge
+        const { rows } = await client.query('SELECT data FROM users WHERE id = $1', [id]);
+        if (rows.length === 0) return new Response("User not found", { status: 404 });
+        
+        const currentData = rows[0].data;
+        const newData = { ...currentData, ...updates };
+        
+        await client.query('UPDATE users SET data = $1 WHERE id = $2', [JSON.stringify(newData), id]);
+        
+        return new Response(JSON.stringify({ success: true, user: newData }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === 'admin/projects' && method === 'GET') {
+        try {
+            // Admin sees ALL projects, active or not
+            const { rows } = await client.query('SELECT data FROM projects ORDER BY updated_at DESC LIMIT 50');
+            const projects = rows.map(r => r.data);
+            return new Response(JSON.stringify(projects), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e: any) {
+            return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } });
+        }
+    }
+
     if (path === 'admin/stats' && method === 'GET') {
         try {
             const userCountRes = await client.query('SELECT COUNT(*) FROM users');
@@ -166,12 +193,12 @@ export const onRequest = async (context: any) => {
             const stats = {
                 totalUsers: parseInt(userCountRes.rows[0].count),
                 activeProjects: parseInt(projectCountRes.rows[0].count),
-                revenue: 0, // Placeholder
-                flaggedContent: 0 // Placeholder
+                revenue: parseInt(userCountRes.rows[0].count) * 10, // Mock revenue metric based on users
+                flaggedContent: 0 
             };
             return new Response(JSON.stringify(stats), { headers: { 'Content-Type': 'application/json' } });
         } catch (e: any) {
-            return new Response(JSON.stringify({ totalUsers: 0, activeProjects: 0 }), { headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ totalUsers: 0, activeProjects: 0, revenue: 0, flaggedContent: 0 }), { headers: { 'Content-Type': 'application/json' } });
         }
     }
 

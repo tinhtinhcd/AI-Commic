@@ -50,11 +50,11 @@ export const PROMPTS = {
     panelImagePrompt: (styleGuide: string, description: string, charDesc: string, worldSetting: string) => `
         (Masterpiece, Best Quality, Ultra-Detailed), ${styleGuide}.
         
-        **VISUAL COMPOSITION & CAMERA:**
-        - Use a **Dynamic Camera Angle** appropriate for the action (e.g., Low Angle for power, High Angle for vulnerability, Dutch Tilt for tension, Extreme Close-up for emotion).
-        - **Depth of Field:** Ensure foreground/background separation to create depth. Avoid flat, 2D composition.
-        - **Framing:** Use "Rule of Thirds" or "Golden Ratio" for interesting placement.
-        - **Lighting:** Cinematic, dramatic lighting (e.g., Rim lighting, Volumetric fog, Chiaroscuro) matching the scene mood.
+        **CINEMATOGRAPHY & VISUAL STORYTELLING:**
+        - **Camera Angle:** STRICTLY adhere to the angle specified in the description (e.g., Low Angle, High Angle, Dutch Tilt, Bird's Eye, Worm's Eye). If none specified, use a dynamic 3/4 view.
+        - **Composition:** Use varied framing (Rule of Thirds, Golden Triangle) to create visual interest.
+        - **Depth:** Use strong foreground elements (Over-the-shoulder, blurred foreground props) to create deep 3D space.
+        - **Lighting:** Cinematic, dramatic lighting (Rim light, Chiaroscuro, God rays) matching the scene mood.
 
         **SCENE DETAILS:**
         - **Action:** ${description}
@@ -67,11 +67,11 @@ export const PROMPTS = {
         Context: ${concept}, ${characters}, ${summary}.
         
         **CRITICAL INSTRUCTION FOR PANEL VISUALS:**
-        - Do NOT just write "Character A talks". 
-        - You MUST include specific **Camera Directions** in the 'description' field (e.g., "Worm's eye view looking up at...", "Over-the-shoulder shot of...", "Extreme close-up on eyes...", "Wide establishing shot of...").
-        - **Vary the Layout:** Alternate between wide shots, medium shots, and close-ups to create visual rhythm.
+        - **Camera Variety:** You MUST vary camera angles for every panel. Do not use "Mid shot" repeatedly. Use: Low Angle (Power), High Angle (Weakness), Dutch Tilt (Unease), Bird's Eye (Scale).
+        - **Shot Sizes:** Alternate between Extreme Close-ups (eyes/hands), Medium Shots (dialogue), and Wide Establishing Shots.
+        - **Panel Flow:** Describe the intended layout in the description (e.g., "Wide panoramic panel showing the horizon", "Tall vertical panel emphasizing height", "Tilted panel for action").
         
-        Return JSON: { "title": "...", "panels": [ { "description": "Visual description including SPECIFIC CAMERA ANGLE, action, and lighting", "dialogue": "...", "caption": "...", "charactersInvolved": [] } ] }
+        Return JSON: { "title": "...", "panels": [ { "description": "Visual description including SPECIFIC CAMERA ANGLE, SHOT SIZE, and LIGHTING", "dialogue": "...", "caption": "...", "charactersInvolved": [] } ] }
     `,
     
     storyConcept: (theme: string, style: string, language: string) => `Generate unique concept. Theme: ${theme}. Style: ${style}. Output JSON in ${language}: { premise, similarStories, uniqueTwist, genreTrends }`,
