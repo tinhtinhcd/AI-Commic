@@ -301,57 +301,76 @@ export const generateScript = async (theme: string, style: string, language: str
     const result = cleanAndParseJSON(text); return { title: result.title, panels: result.panels.map((p: any) => ({ ...p, id: crypto.randomUUID(), dialogue: p.dialogue || '', charactersInvolved: p.charactersInvolved || [] })) };
 };
 
-export const generateCharacterDesign = async (name: string, styleGuide: string, description: string, worldSetting: string, tier: 'STANDARD' | 'PREMIUM', imageModel: string = 'gemini-2.5-flash-image', referenceImage?: string, customApiKey?: string): Promise<{ description: string, imageUrl: string }> => {
-    // USE CUSTOM KEY IF PROVIDED
-    const ai = getAI(customApiKey);
+export const generateCharacterDesign = async (
+    name: string, 
+    styleGuide: string, 
+    description: string, 
+    worldSetting: string, 
+    tier: 'STANDARD' | 'PREMIUM', 
+    imageModel: string = 'gemini-2.5-flash-image', 
+    referenceImage?: string, 
+    customApiKey?: string,
+    provider: ImageProvider = 'GEMINI'
+): Promise<{ description: string, imageUrl: string }> => {
     
     // 1. Refine description using text model
     const refinedDesc = await unifiedGenerateText({ taskType: 'CREATIVE', modelTier: tier, contents: PROMPTS.characterDesign(name, styleGuide, description, worldSetting) });
     
-    // 2. Generate Image
-    let imageConfig = {}; 
-    if (imageModel === 'gemini-3-pro-image-preview') { imageConfig = { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }; }
-    
-    const parts: any[] = [{ text: PROMPTS.characterImagePrompt(name, refinedDesc, styleGuide) }];
-    if (referenceImage) { 
-        const cleanBase64 = referenceImage.replace(/^data:image\/(png|jpg|jpeg);base64,/, ""); 
-        parts.push({ inlineData: { mimeType: "image/png", data: cleanBase64 } }); 
-        parts[0].text += " Use the attached image as a strict visual reference for the character's facial features and hair."; 
-    }
-    
-    console.log(`[Gemini] Generating Character: ${name} with model ${imageModel}`);
-    
-    try {
-        // Apply Retry Logic for Image Generation
-        const response = await retryWithBackoff(() => ai.models.generateContent({ 
-            model: imageModel, 
-            contents: { parts: parts }, 
-            config: imageConfig 
-        }));
+    // --- GEMINI HANDLER ---
+    if (provider === 'GEMINI') {
+        const ai = getAI(customApiKey);
+        let imageConfig = {}; 
+        if (imageModel === 'gemini-3-pro-image-preview') { imageConfig = { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }; }
         
-        let imageUrl = ''; 
-        let failureReason = '';
-
-        if (response.candidates && response.candidates[0].content.parts) { 
-            for (const part of response.candidates[0].content.parts) { 
-                if (part.inlineData) { 
-                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`; 
-                } else if (part.text) {
-                    failureReason += part.text;
-                }
-            } 
+        const parts: any[] = [{ text: PROMPTS.characterImagePrompt(name, refinedDesc, styleGuide) }];
+        if (referenceImage) { 
+            const cleanBase64 = referenceImage.replace(/^data:image\/(png|jpg|jpeg);base64,/, ""); 
+            parts.push({ inlineData: { mimeType: "image/png", data: cleanBase64 } }); 
+            parts[0].text += " Use the attached image as a strict visual reference for the character's facial features and hair."; 
         }
         
-        if (!imageUrl) {
-            console.error("[Gemini] Character Generation Failed. Response:", JSON.stringify(response, null, 2));
-            throw new Error(failureReason || "No image returned by AI. It might have been blocked by safety filters.");
-        }
+        console.log(`[Gemini] Generating Character: ${name} with model ${imageModel}`);
+        
+        try {
+            // Apply Retry Logic for Image Generation
+            const response = await retryWithBackoff(() => ai.models.generateContent({ 
+                model: imageModel, 
+                contents: { parts: parts }, 
+                config: imageConfig 
+            }));
+            
+            let imageUrl = ''; 
+            let failureReason = '';
 
-        return { description: refinedDesc, imageUrl };
-    } catch (e) {
-        console.error("[Gemini] API Call Error:", e);
-        throw e;
+            if (response.candidates && response.candidates[0].content.parts) { 
+                for (const part of response.candidates[0].content.parts) { 
+                    if (part.inlineData) { 
+                        imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`; 
+                    } else if (part.text) {
+                        failureReason += part.text;
+                    }
+                } 
+            }
+            
+            if (!imageUrl) {
+                console.error("[Gemini] Character Generation Failed. Response:", JSON.stringify(response, null, 2));
+                throw new Error(failureReason || "No image returned by AI. It might have been blocked by safety filters.");
+            }
+
+            return { description: refinedDesc, imageUrl };
+        } catch (e) {
+            console.error("[Gemini] API Call Error:", e);
+            throw e;
+        }
     }
+
+    // --- OTHER PROVIDERS (Mocked/Placeholder) ---
+    // In a real implementation, you would handle Fetch errors here similarly
+    if (provider === 'MIDJOURNEY' || provider === 'LEONARDO' || provider === 'FLUX') {
+        throw new Error(`${provider} integration requires a valid backend bridge (not configured in this demo). Please switch to Gemini.`);
+    }
+
+    return { description: refinedDesc, imageUrl: '' };
 };
 
 // --- MULTI-PROVIDER PANEL GENERATOR ---

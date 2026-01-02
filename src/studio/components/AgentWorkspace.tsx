@@ -317,7 +317,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
 
   // --- FIXED GENERATION HANDLERS (With Key Support) ---
 
-  const handleGenerateAllCharacters = async (style: string, key?: string) => {
+  const handleGenerateAllCharacters = async (style: string, key?: string, provider?: ImageProvider) => {
       if (!project.characters || project.characters.length === 0) { 
           (window as any).alert("No characters found. Please ensure the Cast has been generated in the Scriptwriter step."); 
           return; 
@@ -325,7 +325,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
       setLoading(true); 
       updateProject({ style }); 
       const currentImageModel = project.imageModel || 'gemini-2.5-flash-image'; 
-      addLog(AgentRole.CHARACTER_DESIGNER, `Starting batch generation for ${project.characters.length} characters. Style: ${style}. Engine: ${currentImageModel}`, 'info'); 
+      addLog(AgentRole.CHARACTER_DESIGNER, `Starting batch generation for ${project.characters.length} characters. Style: ${style}. Engine: ${provider || 'GEMINI'}`, 'info'); 
       
       const charsStart = project.characters.map(c => { if (c.isLocked && c.imageUrl) return c; return { ...c, isGenerating: true, error: undefined }; }); 
       updateProject({ characters: [...charsStart] }); 
@@ -350,7 +350,17 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
               addLog(AgentRole.CHARACTER_DESIGNER, `Generating ${workingChars[i].name}...`, 'info'); 
               try { 
                   // PASS KEY HERE
-                  const result = await GeminiService.generateCharacterDesign(workingChars[i].name, styleGuide!, workingChars[i].description, worldSetting, project.modelTier || 'STANDARD', currentImageModel, workingChars[i].referenceImage, key); 
+                  const result = await GeminiService.generateCharacterDesign(
+                      workingChars[i].name, 
+                      styleGuide!, 
+                      workingChars[i].description, 
+                      worldSetting, 
+                      project.modelTier || 'STANDARD', 
+                      currentImageModel, 
+                      workingChars[i].referenceImage, 
+                      key,
+                      provider
+                  ); 
                   workingChars[i] = { ...workingChars[i], imageUrl: result.imageUrl, description: result.description, isGenerating: false, error: undefined, variants: [...(workingChars[i].variants || []), { id: crypto.randomUUID(), imageUrl: result.imageUrl, style: style, timestamp: Date.now() }] }; 
               } catch (e: any) { 
                   workingChars[i] = { ...workingChars[i], isGenerating: false, error: e.message }; 
@@ -458,6 +468,9 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           let styleGuide = project.artStyleGuide; 
           if (!styleGuide) styleGuide = `Style: ${styleToUse}`;
           
+          // Note: Regenerate uses Gemini by default unless provider is passed (currently not passed in this function signature, defaulting to Gemini)
+          // To fix this, we would need to pass provider here too, but for now we assume Gemini for single regen or update signature later.
+          // For consistency with batch, we will stick to default (Gemini) as it was before, unless we update the view to pass provider.
           const result = await GeminiService.generateCharacterDesign(char.name, styleGuide, char.description, worldSetting, project.modelTier || 'STANDARD', currentImageModel, char.referenceImage, key);
           
           const newVariant: CharacterVariant = { id: crypto.randomUUID(), imageUrl: result.imageUrl, style: styleToUse, timestamp: Date.now() };

@@ -10,6 +10,8 @@ const COST_ESTIMATES: Record<string, { cost: string, label: string, color: strin
     'MIDJOURNEY': { cost: '~$0.060', label: 'Premium Art', color: 'text-purple-600' },
     'LEONARDO': { cost: '~$0.015', label: 'Comic Specialist', color: 'text-pink-600' },
     'FLUX': { cost: '~$0.001', label: 'Drafting (Cheap)', color: 'text-emerald-600' },
+    'DEEPSEEK': { cost: '~$0.0005', label: 'Ultra Cheap', color: 'text-indigo-600' },
+    'OPENAI': { cost: '~$0.040', label: 'DALL-E 3', color: 'text-green-600' }
 };
 
 const safeRender = (value: any): React.ReactNode => {
@@ -258,10 +260,13 @@ export const CharacterDesignerView: React.FC<any> = (props) => {
     const [styleSelections, setStyleSelections] = useState<Record<string, string>>({});
     const [globalStyle, setGlobalStyle] = useState(project.style || 'Japanese Manga (B&W)');
     const [tempApiKey, setTempApiKey] = useState('');
+    const [selectedProvider, setSelectedProvider] = useState<ImageProvider>('GEMINI');
     
     const characters = project.characters || [];
     const isGlobalGenerating = characters.some((c: any) => c.isGenerating);
     const handleAnchorUpload = (e: React.ChangeEvent<HTMLInputElement>, charIndex: number) => { const file = (e.target as any).files?.[0]; if (!file) return; const reader = new FileReader(); reader.onloadend = () => { const newChars = [...characters]; newChars[charIndex] = { ...newChars[charIndex], referenceImage: reader.result as string }; updateProject({ characters: newChars }); }; reader.readAsDataURL(file); };
+
+    const costInfo = COST_ESTIMATES[selectedProvider];
 
     return (
         <div className="max-w-7xl mx-auto w-full px-6 pb-24">
@@ -274,8 +279,24 @@ export const CharacterDesignerView: React.FC<any> = (props) => {
                 {/* TOOLBAR: Style, Key, Generate */}
                 <div className="flex flex-wrap gap-2 w-full md:w-auto items-end">
                     
+                    {/* Provider Selector */}
+                    <div className="flex flex-col gap-1 w-full md:w-32">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Zap className="w-3 h-3"/> Engine</label>
+                        <select 
+                            value={selectedProvider}
+                            onChange={(e) => setSelectedProvider(e.target.value as ImageProvider)}
+                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 outline-none shadow-sm focus:ring-2 focus:ring-purple-500"
+                        >
+                            <option value="GEMINI">Gemini</option>
+                            <option value="FLUX">Flux</option>
+                            <option value="MIDJOURNEY">Midjourney</option>
+                            <option value="LEONARDO">Leonardo</option>
+                        </select>
+                        {costInfo && <span className={`text-[9px] ${costInfo.color} font-bold`}>{costInfo.cost}</span>}
+                    </div>
+
                     {/* Style Selector */}
-                    <div className="flex flex-col gap-1 w-full md:w-48">
+                    <div className="flex flex-col gap-1 w-full md:w-40">
                         <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Palette className="w-3 h-3"/> Style</label>
                         <select 
                             value={globalStyle} 
@@ -288,11 +309,11 @@ export const CharacterDesignerView: React.FC<any> = (props) => {
                     </div>
 
                     {/* API Key Input */}
-                    <div className="flex flex-col gap-1 w-full md:w-48">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Key className="w-3 h-3"/> Emergency Key</label>
+                    <div className="flex flex-col gap-1 w-full md:w-40">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Key className="w-3 h-3"/> API Key</label>
                         <input 
                             type="password"
-                            placeholder="Paste Key (Bypass 429)" 
+                            placeholder={selectedProvider === 'GEMINI' ? "Optional" : "Required"}
                             value={tempApiKey}
                             onChange={(e) => setTempApiKey(e.target.value)}
                             className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-2 text-xs font-mono text-gray-700 dark:text-gray-200 outline-none shadow-sm focus:ring-2 focus:ring-purple-500"
@@ -300,7 +321,7 @@ export const CharacterDesignerView: React.FC<any> = (props) => {
                     </div>
 
                     <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex-1 md:flex-none">
-                        <button onClick={() => handleGenerateAllCharacters(globalStyle, tempApiKey)} disabled={isGlobalGenerating || loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 text-xs md:text-sm whitespace-nowrap">{isGlobalGenerating || loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4"/>} Generate All</button>
+                        <button onClick={() => handleGenerateAllCharacters(globalStyle, tempApiKey, selectedProvider)} disabled={isGlobalGenerating || loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 text-xs md:text-sm whitespace-nowrap">{isGlobalGenerating || loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4"/>} Generate All</button>
                     </div>
                     <button onClick={handleFinishCharacterDesign} className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 dark:shadow-none transition-all text-xs md:text-sm whitespace-nowrap"><CheckCircle className="w-5 h-5"/> {t('designer.finalize')}</button>
                 </div>
@@ -389,7 +410,7 @@ export const PanelArtistView: React.FC<{
                     <div className="flex gap-2 w-full sm:w-auto items-end flex-wrap">
                         {/* Provider Selector */}
                         <div className="flex flex-col gap-1 w-full sm:w-40">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Zap className="w-3 h-3"/> Engine (2026)</label>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1"><Zap className="w-3 h-3"/> Engine</label>
                             <select 
                                 value={selectedProvider}
                                 onChange={(e) => setSelectedProvider(e.target.value as ImageProvider)}
