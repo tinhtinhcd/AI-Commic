@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ComicProject, WorkflowStage, AgentRole } from '../types';
 import { AGENTS } from '../constants';
-import { Settings, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Trash2, ArrowRight, RotateCcw, Map, Edit, Eye, Lock, Lightbulb, Home, Briefcase, BrainCircuit, FileText } from 'lucide-react';
+import { Settings, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Trash2, ArrowRight, RotateCcw, Map, Edit, Eye, Lock, Lightbulb, Home, Briefcase, BrainCircuit, FileText, Globe, X, Plus, Languages } from 'lucide-react';
 
 interface ManagerViewProps {
     project: ComicProject;
@@ -413,20 +413,114 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
     }
 
     if (activeTab === 'SETTINGS') {
-       // ... existing settings code ...
        return (
             <div className="flex flex-col h-full pb-8">
                 {renderTabs()}
                 <div className="w-full flex flex-col h-full overflow-hidden">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm flex-1 overflow-y-auto custom-scrollbar">
-                        {/* Content same as before */}
-                        <div className="space-y-8 max-w-2xl">
-                            {/* ... Settings Content ... */}
+                        <div className="space-y-8 max-w-3xl">
+                            
+                            {/* SECTION 1: PROJECT METADATA */}
+                            <div className="space-y-4">
+                                <h3 className="font-bold text-lg text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700 pb-2">
+                                    Project Configuration
+                                </h3>
+                                
+                                {/* Title */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Project Title</label>
+                                    <input 
+                                        type="text" 
+                                        value={project.title}
+                                        onChange={(e) => updateProject({ title: e.target.value })}
+                                        className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Enter project title..."
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Master Language */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Master Language</label>
+                                        <div className="relative">
+                                            <select 
+                                                value={project.masterLanguage}
+                                                onChange={(e) => updateProject({ masterLanguage: e.target.value })}
+                                                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 appearance-none focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            >
+                                                {supportedLanguages.map(lang => (
+                                                    <option key={lang} value={lang}>{lang}</option>
+                                                ))}
+                                            </select>
+                                            <Globe className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none"/>
+                                        </div>
+                                    </div>
+
+                                    {/* Art Style */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Art Style</label>
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                value={project.style}
+                                                onChange={(e) => updateProject({ style: e.target.value })}
+                                                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                placeholder="e.g. Manga, Cinematic..."
+                                            />
+                                            <Palette className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECTION 2: LOCALIZATION (Target Languages) */}
+                            <div className="space-y-4">
+                                 <h3 className="font-bold text-lg text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700 pb-2 flex items-center gap-2">
+                                    <Languages className="w-5 h-5 text-indigo-600"/> Localization
+                                </h3>
+                                <div>
+                                    <label className="text-xs text-gray-500 font-bold uppercase mb-2 block">Target Languages</label>
+                                    <div className="flex flex-wrap gap-2 mb-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700 min-h-[60px]">
+                                        {project.targetLanguages?.map(lang => (
+                                            <span key={lang} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 flex items-center gap-2 group transition-all">
+                                                {lang}
+                                                {lang !== project.masterLanguage && (
+                                                    <button 
+                                                        onClick={() => {
+                                                            const newLangs = project.targetLanguages.filter(l => l !== lang);
+                                                            updateProject({ targetLanguages: newLangs });
+                                                        }}
+                                                        className="text-indigo-400 hover:text-red-500 dark:text-indigo-500 dark:hover:text-red-400"
+                                                    >
+                                                        <X className="w-3 h-3"/>
+                                                    </button>
+                                                )}
+                                            </span>
+                                        ))}
+                                        {project.targetLanguages.length === 0 && <span className="text-gray-400 text-xs italic p-1">No additional languages selected.</span>}
+                                    </div>
+                                    
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Available Languages</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {supportedLanguages.filter(l => !project.targetLanguages?.includes(l)).map(lang => (
+                                            <button 
+                                                key={lang} 
+                                                onClick={() => handleAddLanguage(lang)} 
+                                                className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors flex items-center gap-1 bg-white dark:bg-gray-800"
+                                            >
+                                                <Plus className="w-3 h-3"/> {lang}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECTION 3: AI CONFIG */}
                             <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
                                     <BrainCircuit className="w-5 h-5 text-purple-600"/> AI Engine Configuration
                                 </h3>
-                                {/* ... Engine Selection Code ... */}
+                                
                                 <div className="space-y-4">
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">{t('manager.text_engine')}</label>
@@ -457,24 +551,7 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                 </div>
                             </div>
                             
-                            <div>
-                                <label className="text-xs text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider mb-2 block flex justify-between">
-                                    {t('manager.target_langs')}
-                                </label>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    {project.targetLanguages?.map(lang => (
-                                        <span key={lang} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300">
-                                            {lang}
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                                    {supportedLanguages.filter(l => !project.targetLanguages?.includes(l)).map(lang => (
-                                        <button key={lang} onClick={() => handleAddLanguage(lang)} className="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 dark:text-gray-300 whitespace-nowrap">{lang}</button>
-                                    ))}
-                                </div>
-                            </div>
-                            
+                            {/* SECTION 4: ACTIONS */}
                             <div className="border-t border-gray-100 dark:border-gray-700 pt-6 mt-2 flex flex-col gap-3">
                                 <button onClick={handleExportProjectZip} className="w-full flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs font-bold py-3 px-6 rounded-xl transition-colors border border-gray-200 dark:border-gray-600">
                                     <Archive className="w-4 h-4"/> {t('ui.export_zip_btn')}
