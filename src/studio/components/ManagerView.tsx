@@ -2,7 +2,7 @@
 /// <reference lib="dom" />
 import React, { useState, useEffect } from 'react';
 import { ComicProject, WorkflowStage, AgentRole } from '../types';
-import { AGENTS } from '../constants';
+import { AGENTS, COMMON_STYLES } from '../constants';
 import { Settings, CheckCircle, Archive, Activity, LayoutTemplate, BookOpen, Library, Smartphone, FolderOpen, TrendingUp, Palette, Printer, Trash2, ArrowRight, RotateCcw, Map, Edit, Eye, Lock, Lightbulb, Home, Briefcase, BrainCircuit, FileText, Globe, X, Plus, Languages, Sliders, Hash, Key, Calendar, BarChart4, DollarSign, Info } from 'lucide-react';
 
 interface ManagerViewProps {
@@ -384,13 +384,13 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                         <div className="flex items-center gap-3"><Palette className="w-4 h-4"/><span className="font-bold">{t('action.approve_art')}</span></div>
                                     </button>
                                     <button 
-                                        onClick={handleFinalizeProduction} 
-                                        disabled={loading || !project.panels.some(p => p.imageUrl) || project.workflowStage === WorkflowStage.PRINTING || (project.workflowStage !== WorkflowStage.PRINTING && project.workflowStage !== WorkflowStage.POST_PRODUCTION)} 
-                                        className={`w-full py-4 px-5 rounded-xl flex items-center justify-between text-sm font-medium border transition-all ${project.workflowStage === WorkflowStage.PRINTING ? 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-200 shadow-md shadow-gray-200 dark:shadow-none' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}
+                                        onClick={() => updateProject({ workflowStage: WorkflowStage.PRINTING })}
+                                        disabled={loading || project.workflowStage !== WorkflowStage.VISUALIZING_PANELS} 
+                                        className={`w-full py-4 px-5 rounded-xl flex items-center justify-between text-sm font-medium border transition-all ${project.workflowStage === WorkflowStage.VISUALIZING_PANELS ? 'bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-200 shadow-md shadow-gray-200 dark:shadow-none' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}
                                     >
                                         <div className="flex items-center gap-3"><Printer className="w-4 h-4"/><span className="font-bold">{t('action.start_printing')}</span></div>
                                     </button>
-                                    <button disabled={project.workflowStage !== WorkflowStage.POST_PRODUCTION} className={`w-full py-4 px-5 rounded-xl flex items-center justify-between text-sm font-medium border transition-all ${project.workflowStage === WorkflowStage.POST_PRODUCTION ? 'bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 shadow-md shadow-amber-100 dark:shadow-none' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}>
+                                    <button onClick={handleFinalizeProduction} disabled={project.workflowStage !== WorkflowStage.POST_PRODUCTION} className={`w-full py-4 px-5 rounded-xl flex items-center justify-between text-sm font-medium border transition-all ${project.workflowStage === WorkflowStage.POST_PRODUCTION ? 'bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 shadow-md shadow-amber-100 dark:shadow-none' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}>
                                         <div className="flex items-center gap-3"><Archive className="w-4 h-4"/><span className="font-bold">{isLongFormat ? t('action.finalize_chapter') : t('action.finalize_prod')}</span></div>
                                     </button>
                                     {project.workflowStage !== WorkflowStage.IDLE && (
@@ -559,11 +559,15 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                                             <div className="relative">
                                                 <input 
                                                     type="text" 
+                                                    list="common-art-styles"
                                                     value={project.style}
                                                     onChange={(e) => updateProject({ style: e.target.value })}
                                                     className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                                     placeholder="e.g. Manga, Cinematic..."
                                                 />
+                                                <datalist id="common-art-styles">
+                                                    {COMMON_STYLES.map(s => <option key={s} value={s} />)}
+                                                </datalist>
                                                 <Palette className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none"/>
                                             </div>
                                         </div>

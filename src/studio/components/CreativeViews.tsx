@@ -1,23 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AgentRole, ComicProject, Character, ResearchData, CharacterVariant, AgentTask, ComicPanel, Asset, ImageProvider } from '../types';
-import { AGENTS } from '../constants';
+import { AGENTS, COMMON_STYLES } from '../constants';
 import { MessageCircle, Loader2, Send, FileText, TrendingUp, Upload, Download, BookOpen, Sparkles, Lightbulb, Users, Feather, CheckCircle, RefreshCw, Lock, Unlock, ScanFace, Globe, Palette, Layers, ListTodo, Plus, Check, Trash2, Bot, Play, Film, AlertTriangle, Search, Eraser, PenTool, X, Anchor, Image as ImageIcon, MapPin, Edit2, Key, Zap, DollarSign } from 'lucide-react';
-
-const COMMON_STYLES = [
-    "Japanese Manga (B&W)",
-    "Japanese Manga (Color)",
-    "Webtoon (Vertical)",
-    "American Comic (Modern)",
-    "American Comic (Vintage/Golden Age)",
-    "Anime (Cel-Shaded)",
-    "Disney/Pixar 3D",
-    "Ghibli Style",
-    "Noir / Frank Miller",
-    "Cyberpunk / Neon",
-    "Watercolor / Ink Wash",
-    "Pixel Art"
-];
 
 // UPDATED FOR 2026 PROJECTIONS - COMIC FOCUS
 const COST_ESTIMATES: Record<string, { cost: string, label: string, color: string }> = {

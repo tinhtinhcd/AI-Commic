@@ -1,9 +1,6 @@
 
 import { Client } from '@neondatabase/serverless';
 
-// Hardcoded for Dev Convenience. In Prod, set this in Cloudflare Pages Settings.
-const CONNECTION_STRING = 'postgresql://neondatabase_owner:npg_IbiX43aqpjKE@ep-royal-grass-ah3an10g-pooler.c-3.us-east-1.aws.neon.tech/neondatabase?sslmode=require';
-
 // --- SQL SCHEMA DEFINITION (Code-First approach) ---
 const SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS users (
@@ -64,11 +61,23 @@ export const onRequest = async (context: any) => {
   const method = context.request.method;
   const path = url.pathname.replace('/api/', ''); 
 
-  // Use env var if available, else fallback to hardcoded string
-  const dbUrl = context.env.DATABASE_URL || CONNECTION_STRING;
+  // Use env var if available. REMOVED INVALID HARDCODED STRING.
+  const dbUrl = context.env.DATABASE_URL;
+  
+  if (!dbUrl) {
+      // If no DB is configured, return error or handle gracefully for static serving
+      return new Response(JSON.stringify({ error: "Database not configured" }), { status: 503 });
+  }
+
   // Cast to any to avoid TypeScript errors if @types/pg is missing or incomplete in the environment
   const client: any = new Client(dbUrl);
-  await client.connect();
+  
+  try {
+      await client.connect();
+  } catch (dbErr: any) {
+      console.error("DB Connection Failed:", dbErr);
+      return new Response(JSON.stringify({ error: "Database Connection Failed", details: dbErr.message }), { status: 503 });
+  }
 
   // Helper to ensure DB is ready (Lazy Initialization)
   const ensureSchema = async () => {

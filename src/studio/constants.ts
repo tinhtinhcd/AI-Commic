@@ -1,9 +1,30 @@
 
 import { Agent, AgentRole, WorkflowStage, ComicProject, UserAIPreferences } from './types';
 
-// ... existing translations ...
+export const COMMON_STYLES = [
+    "Japanese Manga (B&W)",
+    "Japanese Manga (Color)",
+    "Webtoon (Vertical)",
+    "American Comic (Modern)",
+    "American Comic (Vintage/Golden Age)",
+    "Anime (Cel-Shaded)",
+    "Disney/Pixar 3D",
+    "Ghibli Style",
+    "Noir / Frank Miller",
+    "Cyberpunk / Neon",
+    "Watercolor / Ink Wash",
+    "Pixel Art",
+    "Photorealistic"
+];
+
+export const DEFAULT_USER_PREFERENCES: UserAIPreferences = {
+    creativeEngine: 'GEMINI',
+    logicEngine: 'GEMINI',
+    translationEngine: 'GEMINI',
+    visualEngine: 'GEMINI'
+};
+
 export const TRANSLATIONS = {
-    // ... (Existing translations kept as is)
     en: {
         'app.title': 'AI Comic Studio',
         'dept.strategy': 'Editorial Dept.',
@@ -441,22 +462,13 @@ export const AGENTS: Record<AgentRole, Agent> = {
   }
 };
 
-// DEFAULT SETTINGS FOR LATE 2025
-export const DEFAULT_USER_PREFERENCES: UserAIPreferences = {
-    creativeEngine: 'OPENAI', // GPT-5 (Creative Lead)
-    logicEngine: 'DEEPSEEK', // DeepSeek-R1 (Logic Lead)
-    translationEngine: 'DEEPSEEK', // DeepSeek-V3 (Speed/Cost)
-    visualEngine: 'GEMINI' // Gemini 3.0 / Imagen 4 (Visual Only)
-};
-
 export const INITIAL_PROJECT_STATE: ComicProject = {
   title: 'Untitled Comic',
   theme: '',
   storyFormat: null,
-  publicationType: 'COMIC', 
+  publicationType: 'COMIC', // Default
   modelTier: 'STANDARD', 
-  textEngine: 'OPENAI', // Defaulting to the best available in 2025
-  imageModel: 'gemini-2.5-flash-image', // Keeping 2.5 flash as "Fast" default, upgradable to 3.0 Pro
+  imageModel: 'gemini-2.5-flash-image', // DEFAULT TO FAST
   totalChapters: '', 
   currentChapter: 1,
   targetPanelCount: 20, 

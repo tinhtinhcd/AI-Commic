@@ -43,7 +43,23 @@ export const PROMPTS = {
         
         Chat Log: ${chatLog}
     `,
-    researchArtStyle: (style: string, culturalSetting: string, language: string) => `Define strict visual rules for style "${style}" in setting "${culturalSetting}". Output a technical prompt prefix in English.`,
+    researchArtStyle: (style: string, culturalSetting: string, language: string) => `
+        Act as an Expert Art Director. Define the STRICT VISUAL RULES for the style: "${style}".
+        Setting: "${culturalSetting}".
+        
+        You must output a technical Prompt Prefix that enforces this style.
+        
+        CRITICAL DIFFERENTIATION GUIDE:
+        - "Manga (B&W)": Emphasize 'black and white ink', 'screentones', 'G-pen lines', 'high contrast', 'speed lines'. No colors.
+        - "Webtoon": Emphasize 'vertical scrolling composition', 'vibrant digital colors', 'soft shading', 'clean lines', 'manhwa aesthetic'.
+        - "Noir": Emphasize 'chiaroscuro', 'heavy shadows', 'high contrast', 'monochrome', 'film noir lighting'.
+        - "Anime": Emphasize 'cel-shaded', 'studio ghibli/mappa style', 'cinematic lighting', 'highly detailed backgrounds'.
+        - "3D Render": Emphasize 'Octane render', 'raytracing', 'subsurface scattering', 'unreal engine 5', 'photorealistic textures'.
+        - "Wuxia/Ink": Emphasize 'traditional chinese ink wash painting', 'watercolor textures', 'flowing lines', 'calligraphic strokes'.
+        - "Photorealistic": Emphasize 'hyper-realistic', 'cinematic lighting', '8k resolution', 'highly detailed', 'photograph', 'depth of field', 'unreal engine 5 style'.
+        
+        Output a plain text paragraph (in English - for the Image Generator) describing the rendering technique, lighting, line quality, and color palette.
+    `,
     characterDesign: (name: string, styleGuide: string, description: string, worldSetting: string) => `Create image prompt for "${name}". Style: "${styleGuide}". Setting: "${worldSetting}". Desc: "${description}". Dynamic pose, expressive face.`,
     characterImagePrompt: (name: string, description: string, styleGuide: string) => `(Masterpiece), ${styleGuide}. Character Sheet: ${name}. Visuals: ${description}. Full body, white background.`,
     
