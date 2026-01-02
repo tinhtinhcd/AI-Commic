@@ -1,9 +1,8 @@
 
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
-import process from 'node:process'
-import fs from 'node:fs'
+import path from 'path'
+import fs from 'fs'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -12,41 +11,41 @@ export default defineConfig(({ mode }) => {
   const projectRoot = process.cwd();
 
   let root = projectRoot;
-  let outDir = resolve(projectRoot, 'dist');
-  let input: any = { main: resolve(projectRoot, 'index.html') };
+  let outDir = path.resolve(projectRoot, 'dist');
+  let input: any = { main: path.resolve(projectRoot, 'index.html') };
   let base = '/'; 
   let emptyOutDir = false;
 
   // Ensure dist directory structure exists to prevent "directory not found" errors
-  const distPath = resolve(projectRoot, 'dist');
+  const distPath = path.resolve(projectRoot, 'dist');
   if (!fs.existsSync(distPath)) {
     fs.mkdirSync(distPath, { recursive: true });
   }
 
   // Build Configuration Logic
   if (target === 'reader') {
-    root = resolve(projectRoot, 'src/reader');
-    outDir = resolve(projectRoot, 'dist/reader'); 
+    root = path.resolve(projectRoot, 'src/reader');
+    outDir = path.resolve(projectRoot, 'dist/reader'); 
     base = '/reader/'; 
-    input = { main: resolve(projectRoot, 'src/reader/index.html') };
+    input = { main: path.resolve(projectRoot, 'src/reader/index.html') };
     emptyOutDir = true; 
   } else if (target === 'studio') {
-    root = resolve(projectRoot, 'src/studio');
-    outDir = resolve(projectRoot, 'dist/studio');
+    root = path.resolve(projectRoot, 'src/studio');
+    outDir = path.resolve(projectRoot, 'dist/studio');
     base = '/studio/'; 
-    input = { main: resolve(projectRoot, 'src/studio/index.html') };
+    input = { main: path.resolve(projectRoot, 'src/studio/index.html') };
     emptyOutDir = true;
   } else if (target === 'admin') {
-    root = resolve(projectRoot, 'src/admin');
-    outDir = resolve(projectRoot, 'dist/admin');
+    root = path.resolve(projectRoot, 'src/admin');
+    outDir = path.resolve(projectRoot, 'dist/admin');
     base = '/admin/';
-    input = { main: resolve(projectRoot, 'src/admin/index.html') };
+    input = { main: path.resolve(projectRoot, 'src/admin/index.html') };
     emptyOutDir = true;
   } else if (target === 'landing') {
     root = projectRoot;
-    outDir = resolve(projectRoot, 'dist');
+    outDir = path.resolve(projectRoot, 'dist');
     base = '/';
-    input = { main: resolve(projectRoot, 'index.html') };
+    input = { main: path.resolve(projectRoot, 'index.html') };
   }
 
   return {
@@ -84,7 +83,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
         alias: {
-            '@': resolve(projectRoot, 'src')
+            '@': path.resolve(projectRoot, 'src')
         }
     }
   }
