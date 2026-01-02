@@ -1,3 +1,4 @@
+
 /// <reference lib="dom" />
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentRole, ComicProject, Character, WorkflowStage, ResearchData, Message, ChapterArchive, AgentTask, CharacterVariant, UserProfile, ImageProvider, ComicPanel } from '../types';
@@ -25,6 +26,7 @@ interface AgentWorkspaceProps {
 
 const AVAILABLE_VOICES = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
 const SUPPORTED_LANGUAGES = ['English', 'Vietnamese', 'Japanese', 'Spanish', 'French', 'German', 'Chinese', 'Korean'];
+// INCREASE DELAY TO 4 SECONDS to handle Free Tier rate limits (15 RPM)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const WORKFLOW_STEPS_CONFIG = [
@@ -355,7 +357,8 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
                   addLog(AgentRole.CHARACTER_DESIGNER, `Failed: ${workingChars[i].name}. ${e.message}`, 'error'); 
               } 
               updateProject({ characters: [...workingChars] }); 
-              await delay(1500); 
+              // SLOW DOWN for free tier
+              await delay(4000); 
           } 
           addLog(AgentRole.CHARACTER_DESIGNER, "Batch generation complete.", 'success'); 
       } catch (e: any) { 
@@ -405,6 +408,8 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
                       addLog(AgentRole.PANEL_ARTIST, `Panel ${i+1} failed: ${error.message}`, 'error');
                   } 
                   updateProject({ panels: [...updatedPanels] }); 
+                  // SLOW DOWN for free tier
+                  await delay(2000);
               } 
           } 
           addLog(AgentRole.PANEL_ARTIST, "Panels ready.", 'success'); 
@@ -449,8 +454,8 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
       const currentImageModel = project.imageModel || 'gemini-2.5-flash-image';
       
       try {
-          const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || "";
-          let styleGuide = project.artStyleGuide;
+          const worldSetting = project.seriesBible?.worldSetting || project.marketAnalysis?.worldSetting || ""; 
+          let styleGuide = project.artStyleGuide; 
           if (!styleGuide) styleGuide = `Style: ${styleToUse}`;
           
           const result = await GeminiService.generateCharacterDesign(char.name, styleGuide, char.description, worldSetting, project.modelTier || 'STANDARD', currentImageModel, char.referenceImage, key);

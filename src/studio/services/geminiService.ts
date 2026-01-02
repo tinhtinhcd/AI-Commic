@@ -58,6 +58,9 @@ const getDeepSeekKey = (): string => {
     const user = getCurrentUser();
     if (user && user.apiKeys?.deepseek) return user.apiKeys.deepseek.trim();
 
+    const envKey = process.env.DEEPSEEK_API_KEY;
+    if (envKey && envKey.length > 0 && !envKey.startsWith('%')) return envKey;
+
     return '';
 };
 
@@ -67,6 +70,9 @@ const getOpenAIKey = (): string => {
 
     const user = getCurrentUser();
     if (user && user.apiKeys?.openai) return user.apiKeys.openai.trim();
+
+    const envKey = process.env.OPENAI_API_KEY;
+    if (envKey && envKey.length > 0 && !envKey.startsWith('%')) return envKey;
 
     return '';
 };
@@ -104,17 +110,19 @@ const getUserPreference = (): UserAIPreferences => {
 };
 
 // --- RETRY UTILITY ---
-const retryWithBackoff = async <T>(fn: () => Promise<T>, retries = 3, baseDelay = 3000): Promise<T> => {
+const retryWithBackoff = async <T>(fn: () => Promise<T>, retries = 3, baseDelay = 2000): Promise<T> => {
     try {
         return await fn();
     } catch (e: any) {
-        // Check for 429 or Quota Exceeded
+        // Check for 429 (Too Many Requests) or 503 (Service Unavailable)
         const isQuota = e.status === 429 || e.code === 429 || e.message?.includes('429') || e.message?.toLowerCase().includes('quota');
+        const isServerErr = e.status === 503 || e.code === 503;
         
-        if (retries > 0 && isQuota) {
-            console.warn(`[Gemini] Quota/Rate Limit hit. Retrying in ${baseDelay}ms... (${retries} retries left)`);
-            await new Promise(resolve => setTimeout(resolve, baseDelay));
-            return retryWithBackoff(fn, retries - 1, baseDelay * 2);
+        if (retries > 0 && (isQuota || isServerErr)) {
+            const delay = baseDelay * (4 - retries); // 2s, 4s, 6s...
+            console.warn(`[AI Service] Quota/Rate Limit hit (${e.status || '429'}). Retrying in ${delay}ms... (${retries} retries left)`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return retryWithBackoff(fn, retries - 1, baseDelay * 1.5);
         }
         throw e;
     }
@@ -147,10 +155,12 @@ const unifiedGenerateText = async (options: GenTextOptions): Promise<string> => 
         }
     }
 
+    // --- OPENAI HANDLER ---
     if (engine === 'OPENAI') {
         const apiKey = getOpenAIKey();
         if (!apiKey) {
             console.warn("OpenAI Preference set but Key missing. Falling back to Gemini.");
+            // Fallback logic proceeds to Gemini block below
         } else {
             let messages: any[] = [];
             if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
@@ -168,19 +178,33 @@ const unifiedGenerateText = async (options: GenTextOptions): Promise<string> => 
             }
 
             try {
-                const openAIModel = (taskType === 'LOGIC') ? 'gpt-5-reasoning' : 'gpt-5';
-                const response = await fetch("https://api.openai.com/v1/chat/completions", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-                    body: JSON.stringify({ model: openAIModel, messages: messages, stream: false, response_format: jsonMode ? { type: "json_object" } : undefined })
+                const openAIModel = (taskType === 'LOGIC') ? 'gpt-4o' : 'gpt-4o-mini';
+                
+                // Wrap fetch in retry logic
+                const response = await retryWithBackoff(async () => {
+                    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({ model: openAIModel, messages: messages, stream: false, response_format: jsonMode ? { type: "json_object" } : undefined })
+                    });
+                    if (!res.ok) {
+                        const err = await res.text();
+                        const status = res.status;
+                        throw { status, message: err };
+                    }
+                    return res;
                 });
-                if (!response.ok) throw new Error(`OpenAI API Error: ${response.status}`);
+
                 const data = await response.json();
                 return data.choices[0].message.content;
-            } catch (e: any) { console.error("OpenAI Error, fallback Gemini", e); }
+            } catch (e: any) { 
+                console.error("OpenAI Error, fallback Gemini", e); 
+                // Don't return, let it fall through to Gemini default
+            }
         }
     }
 
+    // --- DEEPSEEK HANDLER ---
     if (engine === 'DEEPSEEK') {
         const apiKey = getDeepSeekKey();
         if (!apiKey) {
@@ -202,30 +226,42 @@ const unifiedGenerateText = async (options: GenTextOptions): Promise<string> => 
 
             try {
                 const dsModel = (taskType === 'LOGIC') ? 'deepseek-reasoner' : 'deepseek-chat';
-                const response = await fetch("https://api.deepseek.com/chat/completions", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-                    body: JSON.stringify({ model: dsModel, messages: messages, stream: false, response_format: jsonMode ? { type: "json_object" } : undefined })
+                
+                // Wrap fetch in retry logic
+                const response = await retryWithBackoff(async () => {
+                    const res = await fetch("https://api.deepseek.com/chat/completions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({ model: dsModel, messages: messages, stream: false, response_format: jsonMode ? { type: "json_object" } : undefined })
+                    });
+                    if (!res.ok) {
+                        const err = await res.text();
+                        const status = res.status;
+                        throw { status, message: err };
+                    }
+                    return res;
                 });
-                if (!response.ok) throw new Error(`DeepSeek API Error: ${response.status}`);
+
                 const data = await response.json();
                 return data.choices[0].message.content;
             } catch (e: any) { console.error("DeepSeek Error, fallback Gemini", e); }
         }
     }
 
-    // Default: Gemini
+    // --- GEMINI (DEFAULT & FALLBACK) ---
     const ai = getAI();
     const modelName = getTextModel(modelTier);
     const config: any = {};
     if (systemInstruction) config.systemInstruction = systemInstruction;
     if (jsonMode) config.responseMimeType = "application/json";
 
-    const response = await ai.models.generateContent({
+    // Wrap Gemini call in retry logic
+    const response = await retryWithBackoff(() => ai.models.generateContent({
         model: modelName,
         contents: contents,
         config: config
-    });
+    }));
+    
     return response.text!;
 };
 
@@ -283,7 +319,7 @@ export const generateCharacterDesign = async (name: string, styleGuide: string, 
         parts[0].text += " Use the attached image as a strict visual reference for the character's facial features and hair."; 
     }
     
-    console.log(`[Gemini] Generating Character: ${name} with model ${imageModel} (Custom Key: ${!!customApiKey})`);
+    console.log(`[Gemini] Generating Character: ${name} with model ${imageModel}`);
     
     try {
         // Apply Retry Logic for Image Generation
@@ -384,44 +420,10 @@ export const generatePanelImage = async (
         throw new Error("Gemini produced no image.");
     }
 
-    // --- STRATEGY 2: MIDJOURNEY (Placeholder / Mock) ---
-    // Note: Actual MJ API usually requires a Discord bridge or 3rd party wrapper like GoAPI/ImagineAPI
-    if (provider === 'MIDJOURNEY') {
-        // Construct Prompt with --cref (Character Reference)
-        // Since we don't have a real URL hosting service in this pure frontend demo, 
-        // we simulate the logic. In a real app, you'd upload the base64 ref image to S3/Cloudinary first.
-        
-        const mockPublicUrl = "https://example.com/char_ref.png"; // Placeholder
-        let finalPrompt = `${promptText} --ar 16:9 --v 6.0`;
-        
-        if (referenceImageUrl) {
-            // MJ syntax: [URL] prompt --cref [URL] --cw 100
-            finalPrompt = `${promptText} --cref ${mockPublicUrl} --cw 100 --ar 16:9`;
-        }
-
-        console.warn(`[Midjourney Bridge] Sending Prompt: ${finalPrompt}`);
-        // Simulate async delay
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Return a placeholder or the Gemini fallback for this demo
-        // In prod: await fetch('https://api.midjourney-wrapper.com/imagine', ...)
-        throw new Error("Midjourney integration requires a backend bridge (not configured in this demo). Please switch to Gemini.");
-    }
-
-    // --- STRATEGY 3: LEONARDO.AI (Placeholder / Mock) ---
-    if (provider === 'LEONARDO') {
-        // Leonardo uses "Image Guidance" parameters
-        console.warn(`[Leonardo Bridge] Sending Prompt: ${promptText} with Guidance Strength 0.35`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        throw new Error("Leonardo.ai integration requires a valid API Key and backend proxy. Please switch to Gemini.");
-    }
-
-    // --- STRATEGY 4: FLUX (via Grok/Fal.ai) ---
-    if (provider === 'FLUX') {
-        // Flux via Fal.ai or Replicate
-        console.warn(`[Flux Bridge] Sending Prompt: ${promptText}`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        throw new Error("Flux integration requires a Replicate/Fal.ai key. Please switch to Gemini.");
+    // --- OTHER PROVIDERS (Mocked/Placeholder) ---
+    // In a real implementation, you would handle Fetch errors here similarly
+    if (provider === 'MIDJOURNEY' || provider === 'LEONARDO' || provider === 'FLUX') {
+        throw new Error(`${provider} integration requires a valid backend bridge (not configured in this demo). Please switch to Gemini.`);
     }
 
     return '';
@@ -432,14 +434,13 @@ export const generatePanelVideo = async (panel: ComicPanel, style: string): Prom
     const ai = getAI(); 
     const base64Data = panel.imageUrl.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
     
-    // Video generation uses a different method and is more expensive, so we might want less aggressive retries or handle it differently
-    // But applying retry here as well for robustness
+    // Video generation is slower, wait longer between retries
     let operation = await retryWithBackoff(() => ai.models.generateVideos({ 
         model: 'veo-3.1-fast-generate-preview', 
         prompt: `Cinematic motion for a comic panel. ${style} style. ${panel.description}. Subtle movement, parallax effect, atmospheric.`, 
         image: { imageBytes: base64Data, mimeType: 'image/png' }, 
         config: { numberOfVideos: 1, aspectRatio: '16:9', resolution: '720p' } 
-    }), 2, 5000); // Fewer retries, longer delay
+    }), 2, 5000); 
     
     while (!operation.done) { 
         await new Promise(resolve => setTimeout(resolve, 5000)); 
@@ -456,15 +457,16 @@ export const generatePanelVideo = async (panel: ComicPanel, style: string): Prom
     return '';
 };
 
+// ... (Rest of exported functions use unifiedGenerateText or specific logic)
 export const summarizeChapter = async (panels: ComicPanel[], tier: 'STANDARD' | 'PREMIUM'): Promise<string> => { return unifiedGenerateText({ taskType: 'LOGIC', modelTier: tier, contents: PROMPTS.summarizeChapter(panels.map(p => p.description).join(" ")) }); };
 export const generateVoiceover = async (text: string, voiceName: string): Promise<string> => {
     const ai = getAI();
-    const response = await ai.models.generateContent({ model: "gemini-2.5-flash-preview-tts", contents: { parts: [{ text }] }, config: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } });
+    const response = await retryWithBackoff(() => ai.models.generateContent({ model: "gemini-2.5-flash-preview-tts", contents: { parts: [{ text }] }, config: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } }));
     if (response.candidates && response.candidates[0].content.parts) { for (const part of response.candidates[0].content.parts) { if (part.inlineData) { return `data:audio/mp3;base64,${part.inlineData.data}`; } } } return '';
 };
 export const analyzeCharacterConsistency = async (imageBase64: string, targetStyle: string, characterName: string, tier: 'STANDARD' | 'PREMIUM'): Promise<{ isConsistent: boolean, critique: string }> => {
     const ai = getAI(); const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
-    const response = await ai.models.generateContent({ model: getTextModel(tier), contents: { parts: [{ inlineData: { mimeType: 'image/png', data: cleanBase64 } }, { text: PROMPTS.analyzeConsistency(characterName, targetStyle) }] }, config: { responseMimeType: "application/json" } });
+    const response = await retryWithBackoff(() => ai.models.generateContent({ model: getTextModel(tier), contents: { parts: [{ inlineData: { mimeType: 'image/png', data: cleanBase64 } }, { text: PROMPTS.analyzeConsistency(characterName, targetStyle) }] }, config: { responseMimeType: "application/json" } }));
     return cleanAndParseJSON(response.text!);
 };
 export const verifyCharacterVoice = async (character: Character, voiceName: string): Promise<{ isSuitable: boolean; suggestion: string; reason: string }> => {

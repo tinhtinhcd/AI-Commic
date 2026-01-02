@@ -51,7 +51,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY)
+      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY),
+      'process.env.DEEPSEEK_API_KEY': JSON.stringify(process.env.DEEPSEEK_API_KEY || env.DEEPSEEK_API_KEY),
+      'process.env.OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || env.OPENAI_API_KEY)
     },
     root: root,
     base: base,
