@@ -35,6 +35,7 @@ export const getDynamicApiKey = (): string => {
         return envKey;
     }
 
+    console.warn("No API Key found in User Profile, LocalStorage, or Environment Variables.");
     return '';
 };
 
@@ -53,6 +54,7 @@ const getOpenAIKey = (): string => {
 const getAI = () => {
     const key = getDynamicApiKey();
     if (!key) {
+        console.error("CRITICAL: Missing Gemini API Key during getAI() call.");
         throw new Error("MISSING_API_KEY");
     }
     return new GoogleGenAI({ apiKey: key });
@@ -226,7 +228,7 @@ export const generateScript = async (theme: string, style: string, language: str
     const result = cleanAndParseJSON(text); return { title: result.title, panels: result.panels.map((p: any) => ({ ...p, id: crypto.randomUUID(), dialogue: p.dialogue || '', charactersInvolved: p.charactersInvolved || [] })) };
 };
 
-// --- UPDATED IMAGE GENERATION FUNCTIONS ---
+// --- UPDATED IMAGE GENERATION FUNCTIONS WITH LOGGING ---
 
 export const generateCharacterDesign = async (name: string, styleGuide: string, description: string, worldSetting: string, tier: 'STANDARD' | 'PREMIUM', imageModel: string = 'gemini-2.5-flash-image', referenceImage?: string): Promise<{ description: string, imageUrl: string }> => {
     const ai = getAI();
@@ -244,27 +246,35 @@ export const generateCharacterDesign = async (name: string, styleGuide: string, 
         parts[0].text += " Use the attached image as a strict visual reference for the character's facial features and hair."; 
     }
     
-    const response = await ai.models.generateContent({ model: imageModel, contents: { parts: parts }, config: imageConfig });
+    console.log(`[Gemini] Generating Character: ${name} with model ${imageModel}`);
     
-    let imageUrl = ''; 
-    let failureReason = '';
+    try {
+        const response = await ai.models.generateContent({ model: imageModel, contents: { parts: parts }, config: imageConfig });
+        
+        let imageUrl = ''; 
+        let failureReason = '';
 
-    if (response.candidates && response.candidates[0].content.parts) { 
-        for (const part of response.candidates[0].content.parts) { 
-            if (part.inlineData) { 
-                imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`; 
-            } else if (part.text) {
-                // Capture text fallback (often refusal messages)
-                failureReason += part.text;
-            }
-        } 
-    }
-    
-    if (!imageUrl) {
-        throw new Error(failureReason || "No image returned by AI. It might have been blocked by safety filters.");
-    }
+        if (response.candidates && response.candidates[0].content.parts) { 
+            for (const part of response.candidates[0].content.parts) { 
+                if (part.inlineData) { 
+                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`; 
+                } else if (part.text) {
+                    // Capture text fallback (often refusal messages)
+                    failureReason += part.text;
+                }
+            } 
+        }
+        
+        if (!imageUrl) {
+            console.error("[Gemini] Character Generation Failed. Response:", JSON.stringify(response, null, 2));
+            throw new Error(failureReason || "No image returned by AI. It might have been blocked by safety filters.");
+        }
 
-    return { description: refinedDesc, imageUrl };
+        return { description: refinedDesc, imageUrl };
+    } catch (e) {
+        console.error("[Gemini] API Call Error:", e);
+        throw e;
+    }
 };
 
 export const generatePanelImage = async (panel: ComicPanel, styleGuide: string, characters: Character[], worldSetting: string, tier: 'STANDARD' | 'PREMIUM', imageModel: string = 'gemini-2.5-flash-image', assetImage?: string): Promise<string> => {
@@ -293,26 +303,34 @@ export const generatePanelImage = async (panel: ComicPanel, styleGuide: string, 
         } 
     }
     
-    const response = await ai.models.generateContent({ model: imageModel, contents: { parts: parts }, config: imageConfig });
-    
-    let imageUrl = ''; 
-    let failureReason = '';
+    console.log(`[Gemini] Generating Panel with model ${imageModel}. Prompt length: ${promptText.length}`);
 
-    if (response.candidates && response.candidates[0].content.parts) { 
-        for (const part of response.candidates[0].content.parts) { 
-            if (part.inlineData) { 
-                imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`; 
-            } else if (part.text) {
-                failureReason += part.text;
-            }
-        } 
+    try {
+        const response = await ai.models.generateContent({ model: imageModel, contents: { parts: parts }, config: imageConfig });
+        
+        let imageUrl = ''; 
+        let failureReason = '';
+
+        if (response.candidates && response.candidates[0].content.parts) { 
+            for (const part of response.candidates[0].content.parts) { 
+                if (part.inlineData) { 
+                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`; 
+                } else if (part.text) {
+                    failureReason += part.text;
+                }
+            } 
+        }
+
+        if (!imageUrl) {
+            console.error("[Gemini] Panel Generation Failed. Full Response:", JSON.stringify(response, null, 2));
+            throw new Error(failureReason || "AI failed to generate visual. Prompt may be too complex or unsafe.");
+        }
+
+        return imageUrl;
+    } catch (e) {
+        console.error("[Gemini] API Call Error (Panel):", e);
+        throw e;
     }
-
-    if (!imageUrl) {
-        throw new Error(failureReason || "AI failed to generate visual. Prompt may be too complex or unsafe.");
-    }
-
-    return imageUrl;
 };
 
 export const generatePanelVideo = async (panel: ComicPanel, style: string): Promise<string> => {

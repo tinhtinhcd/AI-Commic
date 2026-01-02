@@ -394,6 +394,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
                     const result = await GeminiService.generateCharacterDesign(workingChars[i].name, styleGuide!, workingChars[i].description, worldSetting, project.modelTier || 'STANDARD', currentImageModel); 
                     workingChars[i] = { ...workingChars[i], imageUrl: result.imageUrl, description: result.description, isGenerating: false, error: undefined, variants: [...(workingChars[i].variants || []), { id: crypto.randomUUID(), imageUrl: result.imageUrl, style: selectedStyle, timestamp: Date.now() }] }; 
                 } catch (e: any) { 
+                    console.error("Character Gen Error:", e);
                     workingChars[i] = { ...workingChars[i], isGenerating: false, error: e.message }; 
                     addLog(AgentRole.CHARACTER_DESIGNER, `Failed: ${workingChars[i].name}. ${e.message}`, 'error'); 
                 } 
@@ -402,6 +403,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
             } 
             addLog(AgentRole.CHARACTER_DESIGNER, "Batch generation complete.", 'success'); 
         } catch (e: any) { 
+            console.error("Batch Gen Error:", e);
             addLog(AgentRole.CHARACTER_DESIGNER, `Process error: ${e.message}`, 'error'); 
             const charsReset = project.characters.map(c => ({ ...c, isGenerating: false })); 
             updateProject({ characters: charsReset }); 
@@ -433,6 +435,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
                         const imageUrl = await GeminiService.generatePanelImage(updatedPanels[i], styleGuide!, project.characters, worldSetting, project.modelTier || 'STANDARD', currentImageModel); 
                         updatedPanels[i] = { ...updatedPanels[i], imageUrl, isGenerating: false }; 
                     } catch (error) { 
+                        console.error("Panel Gen Error:", error);
                         updatedPanels[i] = { ...updatedPanels[i], isGenerating: false }; 
                         addLog(AgentRole.PANEL_ARTIST, `Panel ${i+1} Failed: ${(error as Error).message}`, 'error');
                     } 
@@ -462,6 +465,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           newPanels[index] = { ...newPanels[index], imageUrl, isGenerating: false }; 
           updateProject({ panels: newPanels }); 
         } catch (e: any) { 
+            console.error("Regen Panel Error:", e);
             const newPanels = [...project.panels]; 
             newPanels[index] = { ...newPanels[index], isGenerating: false }; 
             updateProject({ panels: newPanels }); 
@@ -488,6 +492,7 @@ const AgentWorkspace: React.FC<AgentWorkspaceProps> = ({ role, project, updatePr
           charsDone[index] = { ...charsDone[index], imageUrl: result.imageUrl, variants: [...(charsDone[index].variants || []), newVariant], description: result.description, isGenerating: false, error: undefined, consistencyStatus, consistencyReport }; 
           updateProject({ characters: charsDone }); 
         } catch (e: any) { 
+            console.error("Regen Char Error:", e);
             const charsFail = [...project.characters]; 
             charsFail[index] = { ...charsFail[index], isGenerating: false, error: e.message }; 
             updateProject({ characters: charsFail }); 
