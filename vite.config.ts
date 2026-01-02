@@ -14,13 +14,7 @@ export default defineConfig(({ mode }) => {
   let outDir = path.resolve(projectRoot, 'dist');
   let input: any = { main: path.resolve(projectRoot, 'index.html') };
   let base = '/'; 
-  let emptyOutDir = false;
-
-  // Ensure dist directory structure exists to prevent "directory not found" errors
-  const distPath = path.resolve(projectRoot, 'dist');
-  if (!fs.existsSync(distPath)) {
-    fs.mkdirSync(distPath, { recursive: true });
-  }
+  let emptyOutDir = true;
 
   // Build Configuration Logic
   if (target === 'reader') {
@@ -28,24 +22,30 @@ export default defineConfig(({ mode }) => {
     outDir = path.resolve(projectRoot, 'dist/reader'); 
     base = '/reader/'; 
     input = { main: path.resolve(projectRoot, 'src/reader/index.html') };
-    emptyOutDir = true; 
   } else if (target === 'studio') {
     root = path.resolve(projectRoot, 'src/studio');
     outDir = path.resolve(projectRoot, 'dist/studio');
     base = '/studio/'; 
     input = { main: path.resolve(projectRoot, 'src/studio/index.html') };
-    emptyOutDir = true;
   } else if (target === 'admin') {
     root = path.resolve(projectRoot, 'src/admin');
     outDir = path.resolve(projectRoot, 'dist/admin');
     base = '/admin/';
     input = { main: path.resolve(projectRoot, 'src/admin/index.html') };
-    emptyOutDir = true;
   } else if (target === 'landing') {
     root = projectRoot;
     outDir = path.resolve(projectRoot, 'dist');
     base = '/';
     input = { main: path.resolve(projectRoot, 'index.html') };
+    // Landing page builds to root dist, we might want to avoid wiping other folders if running sequentially
+    // But typically build:landing is part of full build. 
+    // Careful with emptyOutDir here if running parallel.
+    emptyOutDir = false; 
+  }
+
+  // Ensure output directory exists to prevent build failures
+  if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir, { recursive: true });
   }
 
   return {
@@ -57,7 +57,7 @@ export default defineConfig(({ mode }) => {
     base: base,
     build: {
       outDir: outDir,
-      emptyOutDir: emptyOutDir, 
+      emptyOutDir: emptyOutDir,
       rollupOptions: {
         input: input,
       },
@@ -83,7 +83,10 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
         alias: {
-            '@': path.resolve(projectRoot, 'src')
+            '@': path.resolve(projectRoot, 'src'),
+            '@studio': path.resolve(projectRoot, 'src/studio'),
+            '@reader': path.resolve(projectRoot, 'src/reader'),
+            '@admin': path.resolve(projectRoot, 'src/admin')
         }
     }
   }

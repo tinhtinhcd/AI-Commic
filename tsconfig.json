@@ -18,7 +18,10 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@studio/*": ["./src/studio/*"],
+      "@reader/*": ["./src/reader/*"],
+      "@admin/*": ["./src/admin/*"]
     },
     "types": ["node"]
   },
