@@ -52,9 +52,21 @@ const DrawingCanvas: React.FC<{
         }
     }, []);
 
-    const startDraw = (e: React.MouseEvent) => { setIsDrawing(true); draw(e); };
-    const stopDraw = () => { setIsDrawing(false); const canvas = canvasRef.current; if (canvas) { const ctx = canvas.getContext('2d'); ctx?.beginPath(); } };
-    const draw = (e: React.MouseEvent) => {
+    const startDraw = (e: React.MouseEvent | React.TouchEvent) => { 
+        setIsDrawing(true); 
+        draw(e); 
+    };
+    
+    const stopDraw = () => { 
+        setIsDrawing(false); 
+        const canvas = canvasRef.current; 
+        if (canvas) { 
+            const ctx = canvas.getContext('2d'); 
+            ctx?.beginPath(); 
+        } 
+    };
+    
+    const draw = (e: React.MouseEvent | React.TouchEvent) => {
         if (!isDrawing) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -62,17 +74,34 @@ const DrawingCanvas: React.FC<{
         if (!ctx) return;
 
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        let clientX, clientY;
+
+        if ('touches' in e) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        // Adjust for canvas scale if CSS size differs from attr size
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        const trueX = x * scaleX;
+        const trueY = y * scaleY;
 
         if (tool === 'REDLINE') { ctx.lineWidth = 3; ctx.strokeStyle = '#ff0000'; } 
         else { ctx.lineWidth = tool === 'PEN' ? 2 : 20; ctx.strokeStyle = tool === 'PEN' ? '#000000' : '#ffffff'; }
         
         ctx.lineCap = 'round';
-        ctx.lineTo(x, y);
+        ctx.lineTo(trueX, trueY);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(x, y);
+        ctx.moveTo(trueX, trueY);
     };
 
     const handleSave = () => { if (canvasRef.current) { onSave(canvasRef.current.toDataURL('image/png')); onClose(); } };
@@ -84,8 +113,20 @@ const DrawingCanvas: React.FC<{
                     <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2"><PenTool className="w-5 h-5"/> {title || "Quick Sketch / Fix"}</h3>
                     <button onClick={onClose}><X className="w-6 h-6 text-gray-500 hover:text-red-500"/></button>
                 </div>
-                <div className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900 cursor-crosshair mx-auto overflow-hidden flex-1 w-full flex items-center justify-center">
-                    <canvas ref={canvasRef} width={800} height={450} className="max-w-full max-h-full h-auto w-auto" onMouseDown={startDraw} onMouseUp={stopDraw} onMouseOut={stopDraw} onMouseMove={draw} />
+                <div className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900 cursor-crosshair mx-auto overflow-hidden flex-1 w-full flex items-center justify-center touch-none">
+                    <canvas 
+                        ref={canvasRef} 
+                        width={800} 
+                        height={450} 
+                        className="max-w-full max-h-full h-auto w-auto touch-none" 
+                        onMouseDown={startDraw} 
+                        onMouseUp={stopDraw} 
+                        onMouseOut={stopDraw} 
+                        onMouseMove={draw}
+                        onTouchStart={startDraw}
+                        onTouchEnd={stopDraw}
+                        onTouchMove={draw}
+                    />
                 </div>
                 <div className="flex justify-between items-center">
                     <div className="flex gap-2">
@@ -447,7 +488,7 @@ export const PanelArtistView: React.FC<{
             {/* ASSET LIBRARY SIDEBAR (Responsive Overlay) */}
             {showAssetLibrary && (
                 <>
-                    <div className="absolute inset-0 bg-black/50 z-20 md:hidden" onClick={() => setShowAssetLibrary(false)}></div>
+                    <div className="absolute inset-0 bg-black/50 z-20 md:hidden transition-opacity" onClick={() => setShowAssetLibrary(false)}></div>
                     <div className="absolute inset-y-0 right-0 z-30 w-80 bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 p-4 overflow-y-auto flex flex-col gap-4 shadow-xl transform transition-transform duration-300 md:static md:transform-none">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-gray-800 dark:text-gray-100">Studio Assets</h3>
