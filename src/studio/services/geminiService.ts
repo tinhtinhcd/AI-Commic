@@ -356,13 +356,15 @@ export const generateCharacterDesign = async (
             
             if (!imageUrl) {
                 console.error("[Gemini] Character Generation Failed. Response:", JSON.stringify(response, null, 2));
-                throw new Error(failureReason || "Gemini returned no image. It might have been blocked by safety filters.");
+                // Explicitly mention Safety if we see a finishReason unrelated to success, but usually failureReason covers it.
+                // If text was returned saying "I cannot...", failureReason has it.
+                throw new Error(failureReason || "Gemini refused request (Safety Block). Try simpler prompts.");
             }
 
             return { description: refinedDesc, imageUrl };
         } catch (e: any) {
             console.error("[Gemini] API Call Error:", e);
-            throw new Error(`Gemini Image Gen Failed: ${e.message}`);
+            throw new Error(e.message || "Unknown Gemini Error");
         }
     }
 

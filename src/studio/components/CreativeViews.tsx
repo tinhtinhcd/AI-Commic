@@ -39,6 +39,13 @@ const DrawingCanvas: React.FC<{
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
+        
+        // Prevent scrolling on touch devices while drawing
+        const preventDefault = (e: TouchEvent) => e.preventDefault();
+        canvas.addEventListener('touchstart', preventDefault, { passive: false });
+        canvas.addEventListener('touchmove', preventDefault, { passive: false });
+        canvas.addEventListener('touchend', preventDefault, { passive: false });
+
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         
@@ -52,28 +59,17 @@ const DrawingCanvas: React.FC<{
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             };
         }
+        
+        return () => {
+            canvas.removeEventListener('touchstart', preventDefault);
+            canvas.removeEventListener('touchmove', preventDefault);
+            canvas.removeEventListener('touchend', preventDefault);
+        };
     }, []);
 
-    const startDraw = (e: React.MouseEvent | React.TouchEvent) => { 
-        setIsDrawing(true); 
-        draw(e); 
-    };
-    
-    const stopDraw = () => { 
-        setIsDrawing(false); 
-        const canvas = canvasRef.current; 
-        if (canvas) { 
-            const ctx = canvas.getContext('2d'); 
-            ctx?.beginPath(); 
-        } 
-    };
-    
-    const draw = (e: React.MouseEvent | React.TouchEvent) => {
-        if (!isDrawing) return;
+    const getCoordinates = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        if (!canvas) return { x: 0, y: 0 };
 
         const rect = canvas.getBoundingClientRect();
         let clientX, clientY;
@@ -82,34 +78,57 @@ const DrawingCanvas: React.FC<{
             clientX = e.touches[0].clientX;
             clientY = e.touches[0].clientY;
         } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
+            clientX = (e as React.MouseEvent).clientX;
+            clientY = (e as React.MouseEvent).clientY;
         }
 
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
-
-        // Adjust for canvas scale if CSS size differs from attr size
+        // Calculate scale in case canvas is resized via CSS
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-        
-        const trueX = x * scaleX;
-        const trueY = y * scaleY;
+
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    };
+
+    const startDraw = (e: React.MouseEvent | React.TouchEvent) => { 
+        setIsDrawing(true); 
+        const { x, y } = getCoordinates(e);
+        const ctx = canvasRef.current?.getContext('2d');
+        if (ctx) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+    };
+    
+    const stopDraw = () => { 
+        setIsDrawing(false); 
+        const ctx = canvasRef.current?.getContext('2d'); 
+        ctx?.beginPath(); 
+    };
+    
+    const draw = (e: React.MouseEvent | React.TouchEvent) => {
+        if (!isDrawing) return;
+        const ctx = canvasRef.current?.getContext('2d');
+        if (!ctx) return;
+
+        const { x, y } = getCoordinates(e);
 
         if (tool === 'REDLINE') { ctx.lineWidth = 3; ctx.strokeStyle = '#ff0000'; } 
         else { ctx.lineWidth = tool === 'PEN' ? 2 : 20; ctx.strokeStyle = tool === 'PEN' ? '#000000' : '#ffffff'; }
         
         ctx.lineCap = 'round';
-        ctx.lineTo(trueX, trueY);
+        ctx.lineTo(x, y);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(trueX, trueY);
+        ctx.moveTo(x, y);
     };
 
     const handleSave = () => { if (canvasRef.current) { onSave(canvasRef.current.toDataURL('image/png')); onClose(); } };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl max-w-4xl w-full flex flex-col gap-4 max-h-[90vh]">
                 <div className="flex justify-between items-center">
                     <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2"><PenTool className="w-5 h-5"/> {title || "Quick Sketch / Fix"}</h3>
@@ -120,7 +139,8 @@ const DrawingCanvas: React.FC<{
                         ref={canvasRef} 
                         width={800} 
                         height={450} 
-                        className="max-w-full max-h-full h-auto w-auto touch-none" 
+                        className="max-w-full max-h-full w-auto h-auto touch-none"
+                        style={{ touchAction: 'none' }}
                         onMouseDown={startDraw} 
                         onMouseUp={stopDraw} 
                         onMouseOut={stopDraw} 
@@ -136,7 +156,7 @@ const DrawingCanvas: React.FC<{
                         <button onClick={() => setTool('REDLINE')} className={`p-2 rounded-lg border ${tool === 'REDLINE' ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-200 text-gray-600'}`} title="Redline Correction"><Edit2 className="w-4 h-4"/></button>
                         <button onClick={() => setTool('ERASER')} className={`p-2 rounded-lg border ${tool === 'ERASER' ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-gray-200 text-gray-600'}`} title="Eraser"><Eraser className="w-4 h-4"/></button>
                     </div>
-                    <button onClick={handleSave} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700">Save</button>
+                    <button onClick={handleSave} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 text-sm">Save</button>
                 </div>
             </div>
         </div>
@@ -327,7 +347,56 @@ export const CharacterDesignerView: React.FC<any> = (props) => {
                 </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{characters.map((char: Character, idx: number) => (<div key={char.id} className={`bg-white dark:bg-gray-800 border ${char.consistencyStatus === 'FAIL' ? 'border-red-400' : 'border-gray-200 dark:border-gray-700'} rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all group flex flex-col h-full`}><div className="aspect-square bg-gray-50 dark:bg-gray-900 relative overflow-hidden flex items-center justify-center shrink-0">{char.referenceImage && (<div className="absolute top-2 left-2 z-20 bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold shadow-md flex items-center gap-1" title="Using Anchor Image"><Anchor className="w-3 h-3"/> Anchored</div>)}{char.isGenerating && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-purple-600 bg-white/90 z-10"><Loader2 className="w-8 h-8 animate-spin"/></div>)}{char.imageUrl ? (<img src={char.imageUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />) : (<Users className="w-12 h-12 text-gray-300 dark:text-gray-600"/>)}<div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm"><label className="p-3 bg-white rounded-full text-gray-800 hover:text-blue-600 shadow-lg transform hover:scale-110 transition-all cursor-pointer" title="Upload Reference (Manual)"><Upload className="w-5 h-5"/><input type="file" className="hidden" accept="image/*" onChange={(e) => handleCharacterUpload(e, idx)} /></label><label className="p-3 bg-white rounded-full text-gray-800 hover:text-indigo-600 shadow-lg transform hover:scale-110 transition-all cursor-pointer" title="Upload Anchor Image (For AI Consistency)"><Anchor className="w-5 h-5"/><input type="file" className="hidden" accept="image/*" onChange={(e) => handleAnchorUpload(e, idx)} /></label><button onClick={() => toggleCharacterLock(char.id)} className={`p-3 rounded-full shadow-lg transform hover:scale-110 transition-all ${char.isLocked ? 'bg-emerald-500 text-white' : 'bg-white text-gray-400 hover:text-emerald-500'}`} title="Lock Design">{char.isLocked ? <Lock className="w-5 h-5"/> : <Unlock className="w-5 h-5"/>}</button></div></div>{char.variants && char.variants.length > 0 && (<div className="px-4 pt-4 pb-2 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700"><p className="text-[10px] font-bold text-gray-400 uppercase mb-2 flex items-center gap-1"><Layers className="w-3 h-3"/> Variations</p><div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">{char.variants.map((variant) => (<button key={variant.id} onClick={() => handleSelectCharacterVariant(idx, variant)} className={`w-10 h-10 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${char.imageUrl === variant.imageUrl ? 'border-purple-500 ring-2 ring-purple-100 dark:ring-purple-900' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'}`}><img src={variant.imageUrl} className="w-full h-full object-cover" /></button>))}</div></div>)}<div className="p-5 flex-1 flex flex-col space-y-4"><div><h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">{char.name}</h3><span className="text-xs text-purple-600 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded">{char.role}</span></div><div><textarea className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-2 text-xs text-gray-600 dark:text-gray-300 focus:border-purple-300 outline-none resize-none h-20" value={char.description} onChange={(e) => handleUpdateCharacterDescription(idx, (e.target as any).value)} /></div><div className="flex gap-2"><button onClick={() => handleRegenerateSingleCharacter(char, idx, globalStyle, tempApiKey)} className="flex-1 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 p-2 rounded-lg hover:bg-purple-200 font-bold text-xs">Regenerate</button><button onClick={() => handleCheckConsistency(char, idx)} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-50" title="Check Consistency"><ScanFace className="w-4 h-4"/></button></div></div></div>))}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {characters.map((char: Character, idx: number) => (
+                    <div key={char.id} className={`bg-white dark:bg-gray-800 border ${char.error ? 'border-red-400 dark:border-red-500' : char.consistencyStatus === 'FAIL' ? 'border-amber-400' : 'border-gray-200 dark:border-gray-700'} rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all group flex flex-col h-full`}>
+                        <div className="aspect-square bg-gray-50 dark:bg-gray-900 relative overflow-hidden flex items-center justify-center shrink-0">
+                            
+                            {/* ERROR OVERLAY */}
+                            {char.error && (
+                                <div className="absolute inset-0 z-20 bg-white/90 dark:bg-gray-900/90 flex flex-col items-center justify-center p-6 text-center backdrop-blur-sm">
+                                    <AlertTriangle className="w-10 h-10 text-red-500 mb-3"/>
+                                    <p className="text-xs font-bold text-red-600 dark:text-red-400 mb-4 leading-relaxed">{char.error}</p>
+                                    <button 
+                                        onClick={() => handleRegenerateSingleCharacter(char, idx, globalStyle, tempApiKey)} 
+                                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-md"
+                                    >
+                                        <RefreshCw className="w-3 h-3"/> Retry Now
+                                    </button>
+                                </div>
+                            )}
+
+                            {char.referenceImage && !char.error && (<div className="absolute top-2 left-2 z-20 bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold shadow-md flex items-center gap-1" title="Using Anchor Image"><Anchor className="w-3 h-3"/> Anchored</div>)}
+                            
+                            {char.isGenerating && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-purple-600 bg-white/90 z-10">
+                                    <Loader2 className="w-8 h-8 animate-spin"/>
+                                    <span className="text-xs font-bold animate-pulse">Generating...</span>
+                                </div>
+                            )}
+                            
+                            {char.imageUrl ? (<img src={char.imageUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />) : (<Users className="w-12 h-12 text-gray-300 dark:text-gray-600"/>)}
+                            
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm">
+                                <label className="p-3 bg-white rounded-full text-gray-800 hover:text-blue-600 shadow-lg transform hover:scale-110 transition-all cursor-pointer" title="Upload Reference (Manual)"><Upload className="w-5 h-5"/><input type="file" className="hidden" accept="image/*" onChange={(e) => handleCharacterUpload(e, idx)} /></label>
+                                <label className="p-3 bg-white rounded-full text-gray-800 hover:text-indigo-600 shadow-lg transform hover:scale-110 transition-all cursor-pointer" title="Upload Anchor Image (For AI Consistency)"><Anchor className="w-5 h-5"/><input type="file" className="hidden" accept="image/*" onChange={(e) => handleAnchorUpload(e, idx)} /></label>
+                                <button onClick={() => toggleCharacterLock(char.id)} className={`p-3 rounded-full shadow-lg transform hover:scale-110 transition-all ${char.isLocked ? 'bg-emerald-500 text-white' : 'bg-white text-gray-400 hover:text-emerald-500'}`} title="Lock Design">{char.isLocked ? <Lock className="w-5 h-5"/> : <Unlock className="w-5 h-5"/>}</button>
+                            </div>
+                        </div>
+                        
+                        {char.variants && char.variants.length > 0 && (<div className="px-4 pt-4 pb-2 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700"><p className="text-[10px] font-bold text-gray-400 uppercase mb-2 flex items-center gap-1"><Layers className="w-3 h-3"/> Variations</p><div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">{char.variants.map((variant) => (<button key={variant.id} onClick={() => handleSelectCharacterVariant(idx, variant)} className={`w-10 h-10 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${char.imageUrl === variant.imageUrl ? 'border-purple-500 ring-2 ring-purple-100 dark:ring-purple-900' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'}`}><img src={variant.imageUrl} className="w-full h-full object-cover" /></button>))}</div></div>)}
+                        
+                        <div className="p-5 flex-1 flex flex-col space-y-4">
+                            <div><h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">{char.name}</h3><span className="text-xs text-purple-600 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded">{char.role}</span></div>
+                            <div><textarea className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-2 text-xs text-gray-600 dark:text-gray-300 focus:border-purple-300 outline-none resize-none h-20" value={char.description} onChange={(e) => handleUpdateCharacterDescription(idx, (e.target as any).value)} /></div>
+                            <div className="flex gap-2">
+                                <button onClick={() => handleRegenerateSingleCharacter(char, idx, globalStyle, tempApiKey)} className="flex-1 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 p-2 rounded-lg hover:bg-purple-200 font-bold text-xs">Regenerate</button>
+                                <button onClick={() => handleCheckConsistency(char, idx)} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-50" title="Check Consistency"><ScanFace className="w-4 h-4"/></button>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
